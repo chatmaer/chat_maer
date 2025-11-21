@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Circle, Square, Crown, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Header from '../components/Header';
-import { getSocket, connectSocket } from '../utils/socket';
+import { getSocket } from '../utils/socket';
 import { useNotification } from '../contexts/NotificationContext';
+import ticTacToeLogo from '../assets/tic-tac-toe.png';
+import checkersLogo from '../assets/checkers.png';
+import chessLogo from '../assets/chess.png';
 
 interface HomeProps {
   onNavigate: (page: string, data?: { gameType?: string; keyword?: string; roomId?: string }) => void;
@@ -37,21 +40,21 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
     {
       id: 'tic-tac-toe',
       name: t('home.games.ticTacToe.name'),
-      icon: Circle,
+      logo: ticTacToeLogo,
       color: 'from-blue-500 to-cyan-500',
       description: t('home.games.ticTacToe.description'),
     },
     {
       id: 'checkers',
       name: t('home.games.checkers.name'),
-      icon: Square,
+      logo: checkersLogo,
       color: 'from-red-500 to-orange-500',
       description: t('home.games.checkers.description'),
     },
     {
       id: 'chess',
       name: t('home.games.chess.name'),
-      icon: Crown,
+      logo: chessLogo,
       color: 'from-purple-500 to-pink-500',
       description: t('home.games.chess.description'),
     },
@@ -198,10 +201,10 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
       <Header isConnected={isConnected} userId={userId} onNavigate={onNavigate} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-1 flex flex-col">
         {/* Username change section */}
         {isUsernameSet && (
           <div className="mb-6 flex justify-end">
@@ -259,60 +262,63 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
           </div>
         )}
 
-        <div className="text-center mb-16 animate-fade-in">
-          <h2 className="text-5xl font-bold text-gray-900 mb-4">
-            {t('home.playChatCompete')}
-          </h2>
-          <p className="text-xl text-gray-600">
-            {t('home.joinFriends')}
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          {games.map((game) => {
-            const Icon = game.icon;
-            return (
-              <div
-                key={game.id}
-                className={`bg-white rounded-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
-                  selectedGame === game.id ? 'ring-4 ring-blue-500 ring-offset-2' : ''
-                }`}
-                onClick={() => setSelectedGame(game.id)}
-              >
-                <div
-                  className={`w-16 h-16 bg-gradient-to-br ${game.color} rounded-2xl flex items-center justify-center mb-4 mx-auto`}
-                >
-                  <Icon className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
-                  {game.name}
-                </h3>
-                <p className="text-gray-600 text-center text-sm">{game.description}</p>
-              </div>
-            );
-          })}
-        </div>
-
-        {selectedGame && (
-          <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <Users className="w-6 h-6 text-blue-600" />
-                <h3 className="text-2xl font-bold text-gray-900">
-                  {t('home.connectToMatch')}
-                </h3>
-              </div>
-
-              <button
-                onClick={() => handleRandomMatch(selectedGame)}
-                className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mb-6"
-              >
-                {t('home.playRandomMatch')}
-              </button>
-
-            </div>
+        <div className="flex-1 flex flex-col justify-center">
+          <div className="text-center mb-16 animate-fade-in">
+            <h2 className="text-5xl font-bold text-gray-900 mb-4">
+              {t('home.playChatCompete')}
+            </h2>
+            <p className="text-xl text-gray-600">
+              {t('home.joinFriends')}
+            </p>
           </div>
-        )}
+
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {games.map((game) => {
+              return (
+                <div
+                  key={game.id}
+                  className={`bg-white rounded-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
+                    selectedGame === game.id ? 'ring-4 ring-blue-500 ring-offset-2' : ''
+                  }`}
+                  onClick={() => setSelectedGame(game.id)}
+                >
+                  <div className="w-32 h-32 mb-4 mx-auto flex items-center justify-center">
+                    <img 
+                      src={game.logo} 
+                      alt={game.name} 
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                    {game.name}
+                  </h3>
+                  <p className="text-gray-600 text-center text-sm">{game.description}</p>
+                </div>
+              );
+            })}
+          </div>
+
+          {selectedGame && (
+            <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <div className="flex items-center gap-3 mb-6">
+                  <Users className="w-6 h-6 text-blue-600" />
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    {t('home.connectToMatch')}
+                  </h3>
+                </div>
+
+                <button
+                  onClick={() => handleRandomMatch(selectedGame)}
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mb-6"
+                >
+                  {t('home.playRandomMatch')}
+                </button>
+
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
