@@ -108,6 +108,161 @@ const checkPlayersBalance = async (
 };
 
 /**
+ * Handle winner when a player leaves during an active game
+ * @param io Socket.IO server instance
+ * @param roomId Room ID
+ * @param leavingUserId User ID of the player who left
+ * @param remainingPlayers Remaining players in the room
+ * @param gameType Game type
+ * @returns true if winner was processed, false otherwise
+ */
+const handlePlayerLeaveWinner = async (
+  io: Server,
+  roomId: string,
+  leavingUserId: string,
+  remainingPlayers: Array<{ id: string; username: string }>,
+  gameType: string,
+): Promise<boolean> => {
+  try {
+    // Only process if game was playing and there's exactly 1 remaining player
+    if (remainingPlayers.length !== 1) {
+      return false;
+    }
+
+    const roomInfo = (await query(
+      "SELECT status FROM rooms WHERE id = ?",
+      [roomId],
+    )) as Array<{ status: string }>;
+
+    if (roomInfo.length === 0 || roomInfo[0].status !== "playing") {
+      return false; // Room doesn't exist or is not playing
+    }
+
+    const winnerId = remainingPlayers[0].id;
+    const matchId = uuidv4();
+
+    // Create match record
+    await query(
+      `INSERT INTO matches (id, room_id, game_type, winner_id, moves_json, result)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        matchId,
+        roomId,
+        gameType,
+        winnerId,
+        JSON.stringify([]), // No moves since player left
+        "win",
+      ],
+    );
+
+    // Process betting payouts
+    const bettingInfo = await getRoomBettingInfo(roomId);
+    if (bettingInfo && bettingInfo.betting_status === "locked") {
+      const bettingAmount = bettingInfo.betting_amount;
+      const totalPot = bettingAmount * 2; // Both players bet
+      const platformFee = totalPot * 0.1; // 10% platform fee
+      const winnerPayout = totalPot * 0.9; // 90% to winner
+
+      // Winner gets 90% of the pot
+      const winnerBalance = await getUserBalance(winnerId);
+      const newWinnerBalance = winnerBalance + winnerPayout;
+      await updateUserBalance(winnerId, newWinnerBalance);
+
+      // Record winner transaction
+      await query(
+        `INSERT INTO betting_transactions 
+         (id, room_id, match_id, user_id, transaction_type, amount, balance_before, balance_after)
+         VALUES (?, ?, ?, ?, 'bet_won', ?, ?, ?)`,
+        [
+          uuidv4(),
+          roomId,
+          matchId,
+          winnerId,
+          winnerPayout,
+          winnerBalance,
+          newWinnerBalance,
+        ],
+      );
+
+      // Loser loses their bet (already deducted when betting was locked)
+      const loserBalance = await getUserBalance(leavingUserId);
+      await query(
+        `INSERT INTO betting_transactions 
+         (id, room_id, match_id, user_id, transaction_type, amount, balance_before, balance_after)
+         VALUES (?, ?, ?, ?, 'bet_lost', ?, ?, ?)`,
+        [
+          uuidv4(),
+          roomId,
+          matchId,
+          leavingUserId,
+          -bettingAmount,
+          loserBalance + bettingAmount, // balance before bet was placed
+          loserBalance,
+        ],
+      );
+
+      // Platform fee (stored as a system transaction)
+      await query(
+        `INSERT INTO betting_transactions 
+         (id, room_id, match_id, user_id, transaction_type, amount, balance_before, balance_after)
+         VALUES (?, ?, ?, ?, 'platform_fee', ?, 0, ?)`,
+        [
+          uuidv4(),
+          roomId,
+          matchId,
+          winnerId, // Reference user for the transaction
+          platformFee,
+          platformFee,
+        ],
+      );
+
+      logger.info(
+        `Betting payout (player left): Winner ${winnerId} received ${winnerPayout} BRL, Platform fee: ${platformFee} BRL`,
+      );
+
+      // Emit balance updates to all players in the room
+      const updatedBalances: Array<{ userId: string; balance: number }> = [];
+      const winnerBalanceUpdate = await getUserBalance(winnerId);
+      updatedBalances.push({ userId: winnerId, balance: winnerBalanceUpdate });
+      
+      // Emit balance update event
+      io.to(roomId).emit("balance_updated", {
+        roomId,
+        balances: updatedBalances,
+        winnerId,
+        winnerPayout,
+        isDraw: false,
+      });
+    }
+
+    // Update room status to finished
+    await updateRoomStatus(roomId, "finished");
+
+    // Get game state for final emit
+    const game = getGame(roomId);
+    const gameState = game ? getGameState(game) : null;
+
+    // Emit game_over event
+    io.to(roomId).emit("game_over", {
+      winner: winnerId,
+      isDraw: false,
+      gameState: gameState,
+      reason: "opponent_left",
+    });
+
+    logger.info(
+      { roomId, winnerId, leavingUserId },
+      "Player left during game - remaining player declared winner",
+    );
+
+    return true;
+  } catch (error) {
+    logger.error(error, "Error in handlePlayerLeaveWinner");
+    return false;
+  }
+};
+
+/**
  * Attempt to start the game if both players are present and have sufficient balance
  * @param io Socket.IO server instance
  * @param roomId Room ID to check
@@ -1843,7 +1998,23 @@ export const setupSocketHandlers = (io: Server): void => {
           if (room.length > 0) {
             const wasPlaying = room[0].status === "playing";
             
-            // Update room status to waiting if it was playing
+            // If game was playing and there's 1 remaining player, make them the winner
+            if (wasPlaying && players.length === 1) {
+              const winnerProcessed = await handlePlayerLeaveWinner(
+                io,
+                roomId,
+                socketWithUserId.userId,
+                players,
+                room[0].game_type,
+              );
+              
+              // If winner was processed, don't continue with normal leave flow
+              if (winnerProcessed) {
+                return;
+              }
+            }
+            
+            // Update room status to waiting if it was playing (and winner wasn't processed)
             if (wasPlaying) {
               await updateRoomStatus(roomId, "waiting");
             }
@@ -1916,7 +2087,23 @@ export const setupSocketHandlers = (io: Server): void => {
             if (room.length > 0) {
               const wasPlaying = room[0].status === "playing";
               
-              // Update room status to waiting if it was playing
+              // If game was playing and there's 1 remaining player, make them the winner
+              if (wasPlaying && players.length === 1) {
+                const winnerProcessed = await handlePlayerLeaveWinner(
+                  io,
+                  roomId,
+                  userId,
+                  players,
+                  room[0].game_type,
+                );
+                
+                // If winner was processed, don't continue with normal disconnect flow
+                if (winnerProcessed) {
+                  return;
+                }
+              }
+              
+              // Update room status to waiting if it was playing (and winner wasn't processed)
               if (wasPlaying) {
                 await updateRoomStatus(roomId, "waiting");
               }

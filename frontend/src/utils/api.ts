@@ -1,5 +1,11 @@
+import { API_BASE_URL, getApiUrl } from '../config/api';
+
 /**
  * Utility function to make authenticated API requests
+ * 
+ * @param url - Full URL or endpoint path (if endpoint, will be prefixed with API_BASE_URL)
+ * @param options - Fetch options
+ * @returns Promise<Response>
  */
 export const authenticatedFetch = async (
   url: string,
@@ -19,7 +25,10 @@ export const authenticatedFetch = async (
     headers.set('Content-Type', 'application/json');
   }
   
-  return fetch(url, {
+  // If url doesn't start with http, treat it as an endpoint and prepend API_BASE_URL
+  const fullUrl = url.startsWith('http') ? url : getApiUrl(url);
+  
+  return fetch(fullUrl, {
     ...options,
     headers,
   });

@@ -3,6 +3,7 @@ import { useGoogleLogin } from '@react-oauth/google';
 import { useTranslation } from 'react-i18next';
 import { useNotification } from '../contexts/NotificationContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import { API_ENDPOINTS } from '../config/api';
 import logo from '../assets/home_logo.png';
 import logoFallback from '../assets/home_logo.png';
 
@@ -15,15 +16,13 @@ export default function Login({ onAuthSuccess }: LoginProps) {
   const [googleLoading, setGoogleLoading] = useState(false);
   const { showNotification } = useNotification();
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       setGoogleLoading(true);
       const access_token = tokenResponse.access_token;
       
       try {
-        const response = await fetch(`${API_URL}/api/auth/google`, {
+        const response = await fetch(API_ENDPOINTS.AUTH.GOOGLE, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

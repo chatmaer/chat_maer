@@ -73,8 +73,8 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
 
     try {
       // Set the second username (display username for rooms)
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-      const response = await fetch(`${API_URL}/api/auth/set-username`, {
+      const { API_ENDPOINTS } = await import('../config/api');
+      const response = await fetch(API_ENDPOINTS.AUTH.SET_USERNAME, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

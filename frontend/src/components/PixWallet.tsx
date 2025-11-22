@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, History, X, QrCode, Copy, Check } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
+import { API_ENDPOINTS } from '../config/api';
 
 interface PixWalletProps {
   userId?: string;
@@ -45,8 +46,6 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
   const [payerIdentificationType, setPayerIdentificationType] = useState<string>('CPF');
   const [payerIdentificationNumber, setPayerIdentificationNumber] = useState<string>('');
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-
   useEffect(() => {
     if (userId) {
       checkPixStatus();
@@ -83,7 +82,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     if (!userId) return;
     try {
       const { authenticatedFetch } = await import('../utils/api');
-      const response = await authenticatedFetch(`${API_BASE}/api/pix/pix-key/${userId}`);
+      const response = await authenticatedFetch(API_ENDPOINTS.PIX.PIX_KEY(userId));
       if (response.ok) {
         const data = await response.json();
         setHasPixKey(data.hasPixKey);
@@ -100,7 +99,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     if (!userId) return;
     try {
       const { authenticatedFetch } = await import('../utils/api');
-      const response = await authenticatedFetch(`${API_BASE}/api/pix/transactions`);
+      const response = await authenticatedFetch(API_ENDPOINTS.PIX.TRANSACTIONS);
       if (response.ok) {
         const data = await response.json();
         setTransactions(data.transactions || []);
@@ -132,7 +131,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     setIsLoading(true);
     try {
       const { authenticatedFetch } = await import('../utils/api');
-      const response = await authenticatedFetch(`${API_BASE}/api/pix/deposit/request`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.PIX.DEPOSIT_REQUEST, {
         method: 'POST',
         body: JSON.stringify({
           amount,
@@ -182,8 +181,9 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     const interval = setInterval(async () => {
       try {
         const { authenticatedFetch } = await import('../utils/api');
+        const { API_ENDPOINTS } = await import('../config/api');
         const response = await authenticatedFetch(
-          `${API_BASE}/api/pix/deposit/status/${txId}`,
+          API_ENDPOINTS.PIX.DEPOSIT_STATUS(txId),
         );
         if (response.ok) {
           const data = await response.json();
@@ -238,7 +238,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     setIsLoading(true);
     try {
       const { authenticatedFetch } = await import('../utils/api');
-      const response = await authenticatedFetch(`${API_BASE}/api/pix/withdrawal/request`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.PIX.WITHDRAWAL_REQUEST, {
         method: 'POST',
         body: JSON.stringify({ amount, pixKey: withdrawPixKey }),
       });
@@ -274,8 +274,9 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     if (!userId) return;
     const interval = setInterval(async () => {
       try {
+        const { API_ENDPOINTS } = await import('../config/api');
         const response = await fetch(
-          `${API_BASE}/api/pix/withdrawal/status/${txId}?userId=${userId}`,
+          `${API_ENDPOINTS.PIX.WITHDRAWAL_STATUS(txId)}?userId=${userId}`,
         );
         if (response.ok) {
           const data = await response.json();
@@ -307,7 +308,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     setIsLoading(true);
     try {
       const { authenticatedFetch } = await import('../utils/api');
-      const response = await authenticatedFetch(`${API_BASE}/api/pix/pix-key`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.PIX.PIX_KEY(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pixKey }),

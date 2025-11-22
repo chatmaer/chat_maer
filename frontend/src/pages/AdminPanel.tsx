@@ -3,6 +3,7 @@ import { Users, Ban, CheckCircle, DollarSign, Search, RefreshCw, Shield, AlertTr
 import { useNotification } from '../contexts/NotificationContext';
 import { useDialog } from '../hooks/useDialog';
 import { useTranslation } from 'react-i18next';
+import { API_ENDPOINTS } from '../config/api';
 
 interface User {
   id: string;
@@ -67,7 +68,6 @@ export default function AdminPanel() {
     return localStorage.getItem('userId') || '';
   });
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
   useEffect(() => {
     if (userId) {
@@ -85,7 +85,7 @@ export default function AdminPanel() {
     if (!userId) return;
     setLoading(true);
     try {
-      const response = await authenticatedFetch(`${API_BASE}/api/admin/users`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.USERS, {
         method: 'POST',
         body: JSON.stringify({
           page: currentPage,
@@ -119,7 +119,7 @@ export default function AdminPanel() {
     if (!userId) return;
     setLoading(true);
     try {
-      const response = await authenticatedFetch(`${API_BASE}/api/admin/reports`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.REPORTS, {
         method: 'POST',
         body: JSON.stringify({
           page: currentPage,
@@ -151,7 +151,7 @@ export default function AdminPanel() {
     const { authenticatedFetch } = await import('../utils/api');
     if (!userId) return;
     try {
-      const response = await authenticatedFetch(`${API_BASE}/api/admin/stats`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.STATS, {
         method: 'POST',
         body: JSON.stringify({}),
       });
@@ -180,7 +180,7 @@ export default function AdminPanel() {
     if (!reason) return;
 
     try {
-      const response = await authenticatedFetch(`${API_BASE}/api/admin/users/ban`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.BAN_USER, {
         method: 'POST',
         body: JSON.stringify({
           targetUserId,
@@ -215,7 +215,7 @@ export default function AdminPanel() {
     if (!confirmed) return;
 
     try {
-      const response = await authenticatedFetch(`${API_BASE}/api/admin/users/unban`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.UNBAN_USER, {
         method: 'POST',
         body: JSON.stringify({
           targetUserId,
@@ -257,7 +257,7 @@ export default function AdminPanel() {
 
     try {
       const { authenticatedFetch } = await import('../utils/api');
-      const response = await authenticatedFetch(`${API_BASE}/api/admin/users/balance`, {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.UPDATE_BALANCE, {
         method: 'POST',
         body: JSON.stringify({
           targetUserId,
