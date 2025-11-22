@@ -8,6 +8,11 @@ export const config = {
   },
   nodeEnv: process.env.NODE_ENV || "development",
   clientUrl: process.env.CLIENT_URL || "http://localhost:5173",
+  // Additional allowed origins (comma-separated list for custom domains)
+  // Example: "https://example.com,https://www.example.com,https://app.example.com"
+  allowedOrigins: process.env.ALLOWED_ORIGINS
+    ? process.env.ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
+    : [],
   mercadoPago: {
     accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN || "",
   },
