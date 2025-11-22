@@ -12,6 +12,7 @@
 // Get API URL from environment variable, fallback to localhost for development
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
+console.log('API_BASE_URL', API_BASE_URL, import.meta.env.VITE_GOOGLE_CLIENT_ID);
 // Helper function to build API endpoint URLs
 export const getApiUrl = (endpoint: string): string => {
   // Remove leading slash if present to avoid double slashes
