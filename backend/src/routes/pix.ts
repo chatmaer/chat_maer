@@ -5,7 +5,21 @@ import logger from "../lib/logger.js";
 import { getUserBalance, updateUserBalance } from "../utils/roomManager.js";
 import { authenticateToken, AuthRequest } from "../middleware/auth.js";
 import { config } from "../config/env.js";
-import mercadopago from "mercadopago";
+import { createRequire } from "module";
+
+// Use createRequire to import CommonJS module in ESM context
+const require = createRequire(import.meta.url);
+let mercadopago: any;
+try {
+  mercadopago = require("mercadopago");
+  // Handle both default export and direct export
+  if (mercadopago.default) {
+    mercadopago = mercadopago.default;
+  }
+} catch (error) {
+  logger.error({ error }, "Failed to import mercadopago package. Make sure it's installed: npm install mercadopago");
+  mercadopago = null;
+}
 
 const router = express.Router();
 
@@ -14,7 +28,11 @@ router.use(authenticateToken);
 
 // Initialize Mercado Pago SDK
 if (config.mercadoPago.accessToken) {
-  mercadopago.configurations.setAccessToken(config.mercadoPago.accessToken);
+  if (mercadopago && mercadopago.configurations) {
+    mercadopago.configurations.setAccessToken(config.mercadoPago.accessToken);
+  } else {
+    logger.error("Mercado Pago SDK failed to initialize. Check if mercadopago package is installed correctly.");
+  }
 } else {
   logger.warn("Mercado Pago access token not configured. Pix integration will not work.");
 }
@@ -25,6 +43,14 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
     if (!config.mercadoPago.accessToken) {
       return res.status(503).json({
         error: "Pix integration is not configured",
+        enabled: false,
+      });
+    }
+
+    if (!mercadopago || !mercadopago.payment) {
+      logger.error("Mercado Pago SDK is not available. Please install: npm install mercadopago");
+      return res.status(503).json({
+        error: "Pix integration is not available. Mercado Pago SDK not installed.",
         enabled: false,
       });
     }
@@ -205,9 +231,12 @@ router.get("/deposit/status/:transactionId", async (req: AuthRequest, res) => {
 
     // If we have a Mercado Pago payment ID, check the payment status
     if (mercadoPagoPaymentId) {
-      try {
-        const paymentResponse = await mercadopago.payment.findById(Number(mercadoPagoPaymentId));
-        const payment = paymentResponse.response;
+      if (!mercadopago || !mercadopago.payment) {
+        logger.warn("Mercado Pago SDK is not available. Returning database status only.");
+      } else {
+        try {
+          const paymentResponse = await mercadopago.payment.findById(Number(mercadoPagoPaymentId));
+          const payment = paymentResponse.response;
 
         // Map Mercado Pago status to our status
         let newStatus = tx.status;
@@ -268,9 +297,10 @@ router.get("/deposit/status/:transactionId", async (req: AuthRequest, res) => {
           updatedAt: tx.updated_at,
           mercadoPagoStatus: payment.status,
         });
-      } catch (mpError: any) {
-        logger.error(mpError, "Error checking Mercado Pago payment status");
-        // Fall through to return database status
+        } catch (mpError: any) {
+          logger.error(mpError, "Error checking Mercado Pago payment status");
+          // Fall through to return database status
+        }
       }
     }
 
