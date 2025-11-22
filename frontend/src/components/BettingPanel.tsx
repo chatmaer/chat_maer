@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Coins, Lock, Unlock, Check, X } from 'lucide-react';
 import { getSocket } from '../utils/socket';
 import { useNotification } from '../contexts/NotificationContext';
+import { useTranslation } from 'react-i18next';
 
 interface BettingPanelProps {
   roomId?: string;
@@ -14,6 +15,7 @@ export default function BettingPanel({
   userId,
   players,
 }: BettingPanelProps) {
+  const { t } = useTranslation();
   const { showNotification } = useNotification();
   const [bettingAmount, setBettingAmount] = useState<number | string>(0.25);
   const [bettingStatus, setBettingStatus] = useState<'unlocked' | 'locked'>('unlocked');
@@ -56,7 +58,7 @@ export default function BettingPanel({
         setProposedAmount(data.proposedAmount);
         setIsProposer(false);
         showNotification(
-          `New betting proposal: ${data.proposedAmount.toFixed(2)} BRL`,
+          t('betting.newBettingProposal', { amount: data.proposedAmount.toFixed(2) }),
           'info',
         );
       }
@@ -70,7 +72,7 @@ export default function BettingPanel({
         setBettingStatus('locked');
         setProposedAmount(null);
         showNotification(
-          `Betting locked at ${amountNum.toFixed(2)} BRL`,
+          t('betting.bettingLockedAt', { amount: amountNum.toFixed(2) }),
           'success',
         );
         // Refresh balance
@@ -82,7 +84,7 @@ export default function BettingPanel({
     const handleProposalRejected = (data: { roomId: string }) => {
       if (data.roomId === roomId) {
         setProposedAmount(null);
-        showNotification('Betting proposal was rejected', 'info');
+        showNotification(t('betting.bettingProposalRejected'), 'info');
       }
     };
 
@@ -109,20 +111,20 @@ export default function BettingPanel({
           // Show notification based on result
           if (data.isDraw) {
             showNotification(
-              `Game ended in a draw! Your bet of R$ ${(data.refundAmount || 0).toFixed(2)} has been refunded.`,
+              t('betting.gameEndedDraw', { amount: (data.refundAmount || 0).toFixed(2) }),
               'info',
             );
           } else if (data.winnerId === userId && data.winnerPayout) {
             showNotification(
-              `🎉 You won! You received R$ ${data.winnerPayout.toFixed(2)} (90% of pot)`,
+              t('betting.youWon', { amount: data.winnerPayout.toFixed(2) }),
               'success',
             );
           } else if (data.winnerId && data.winnerId !== userId) {
             // Find winner username
             const winner = players.find((p) => p.id === data.winnerId);
-            const winnerUsername = winner?.username || 'Opponent';
+            const winnerUsername = winner?.username || t('common.opponent');
             showNotification(
-              `${winnerUsername} won. Your bet was lost.`,
+              t('betting.opponentWon', { username: winnerUsername }),
               'info',
             );
           }
@@ -191,18 +193,18 @@ export default function BettingPanel({
 
   const handleProposeAmount = () => {
     if (!roomId || players.length < 2) {
-      showNotification('Need 2 players to change betting amount', 'error');
+      showNotification(t('betting.needTwoPlayers'), 'error');
       return;
     }
 
     if (proposalAmount <= 0) {
-      showNotification('Betting amount must be greater than 0', 'error');
+      showNotification(t('betting.amountMustBeGreater'), 'error');
       return;
     }
 
     const balanceNum = typeof userBalance === 'number' ? userBalance : Number(userBalance || 0);
     if (proposalAmount > balanceNum) {
-      showNotification('Insufficient balance', 'error');
+      showNotification(t('betting.insufficientBalance'), 'error');
       return;
     }
 
@@ -214,7 +216,7 @@ export default function BettingPanel({
       setIsProposer(true);
       setIsLoading(false);
       showNotification(
-        `Proposed betting amount: ${proposalAmount.toFixed(2)} BRL`,
+        t('betting.newBettingProposal', { amount: proposalAmount.toFixed(2) }),
         'info',
       );
     }
@@ -248,13 +250,13 @@ export default function BettingPanel({
     <div className="bg-white rounded-2xl shadow-lg p-6">
       <div className="flex items-center gap-3 mb-6">
         <Coins className="w-6 h-6 text-yellow-600" />
-        <h3 className="text-xl font-bold text-gray-900">Betting</h3>
+        <h3 className="text-xl font-bold text-gray-900">{t('betting.title')}</h3>
       </div>
 
       {/* User Balance */}
       <div className="mb-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700">Your Balance:</span>
+          <span className="text-sm font-medium text-gray-700">{t('betting.yourBalance')}</span>
           <span className="text-lg font-bold text-green-700">
             R$ {typeof userBalance === 'number' 
               ? userBalance.toFixed(2) 
@@ -267,7 +269,7 @@ export default function BettingPanel({
       <div className="mb-4 p-3 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200">
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium text-gray-700">
-            Current Betting Amount:
+            {t('betting.currentBettingAmount')}
           </span>
           <div className="flex items-center gap-2">
             {bettingStatus === 'locked' ? (
@@ -284,8 +286,8 @@ export default function BettingPanel({
         </div>
         <p className="text-xs text-gray-500">
           {bettingStatus === 'locked'
-            ? 'Betting is locked. Game can start.'
-            : 'Betting can be changed when both players agree'}
+            ? t('betting.bettingLocked')
+            : t('betting.bettingCanChange')}
         </p>
       </div>
 
@@ -295,8 +297,8 @@ export default function BettingPanel({
           <p className="text-sm font-medium text-yellow-800 mb-3">
             {(() => {
               const proposer = players.find((p) => p.id !== userId);
-              const proposerName = proposer?.username || 'Opponent';
-              return `${proposerName} proposed:`;
+              const proposerName = proposer?.username || t('common.opponent');
+              return `${proposerName} ${t('betting.proposed')}`;
             })()} <strong>R$ {proposedAmount.toFixed(2)}</strong>
           </p>
           <div className="flex gap-2">
@@ -306,7 +308,7 @@ export default function BettingPanel({
               className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Check className="w-4 h-4" />
-              Accept
+              {t('betting.accept')}
             </button>
             <button
               onClick={handleRejectProposal}
@@ -314,7 +316,7 @@ export default function BettingPanel({
               className="flex-1 bg-red-600 text-white py-2 px-4 rounded-lg font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <X className="w-4 h-4" />
-              Reject
+              {t('betting.reject')}
             </button>
           </div>
         </div>
@@ -324,13 +326,13 @@ export default function BettingPanel({
       {proposedAmount !== null && isProposer && (
         <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-300 rounded-xl">
           <p className="text-sm font-medium text-blue-800">
-            You proposed: <strong>R$ {proposedAmount.toFixed(2)}</strong>
+            {t('betting.youProposed')} <strong>R$ {proposedAmount.toFixed(2)}</strong>
           </p>
           <p className="text-xs text-blue-600 mt-1">
             {(() => {
               const opponent = players.find((p) => p.id !== userId);
-              const opponentName = opponent?.username || 'Opponent';
-              return `Waiting for ${opponentName} to accept...`;
+              const opponentName = opponent?.username || t('common.opponent');
+              return t('betting.waitingForAccept', { username: opponentName });
             })()}
           </p>
         </div>
@@ -341,7 +343,7 @@ export default function BettingPanel({
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Propose New Betting Amount (BRL):
+              {t('betting.proposeNewAmount')}
             </label>
             <input
               type="number"
@@ -353,7 +355,7 @@ export default function BettingPanel({
               placeholder="0.25"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Minimum: R$ 0.01 | Your balance: R$ {typeof userBalance === 'number' 
+              {t('betting.minimum')} R$ 0.01 | {t('betting.yourBalanceLabel')} R$ {typeof userBalance === 'number' 
                 ? userBalance.toFixed(2) 
                 : Number(userBalance || 0).toFixed(2)}
             </p>
@@ -363,7 +365,7 @@ export default function BettingPanel({
             disabled={isLoading || proposalAmount <= 0 || proposalAmount > (typeof userBalance === 'number' ? userBalance : Number(userBalance || 0))}
             className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Propose Amount
+            {t('betting.proposeAmount')}
           </button>
         </div>
       )}
@@ -372,7 +374,7 @@ export default function BettingPanel({
       {players.length < 2 && (
         <div className="p-3 bg-gray-50 border border-gray-200 rounded-xl">
           <p className="text-sm text-gray-600 text-center">
-            Waiting for another player to join...
+            {t('betting.waitingForPlayer')}
           </p>
         </div>
       )}
@@ -381,11 +383,11 @@ export default function BettingPanel({
       {bettingStatus === 'locked' && (
         <div className="mt-4 p-3 bg-purple-50 border-2 border-purple-200 rounded-xl">
           <p className="text-xs text-purple-700">
-            <strong>Winner gets:</strong> R${' '}
-            {((typeof bettingAmount === 'number' ? bettingAmount : Number(bettingAmount || 0)) * 2 * 0.9).toFixed(2)} (90% of pot)
+            <strong>{t('betting.winnerGets')}</strong> R${' '}
+            {((typeof bettingAmount === 'number' ? bettingAmount : Number(bettingAmount || 0)) * 2 * 0.9).toFixed(2)} (90% {t('betting.ofPot')})
           </p>
           <p className="text-xs text-purple-600 mt-1">
-            <strong>Platform fee:</strong> R${' '}
+            <strong>{t('betting.platformFee')}</strong> R${' '}
             {((typeof bettingAmount === 'number' ? bettingAmount : Number(bettingAmount || 0)) * 2 * 0.1).toFixed(2)} (10%)
           </p>
         </div>

@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Video, VideoOff, Mic, MicOff, PhoneOff } from 'lucide-react';
-import { RTCManager, getLocalStream, startVideo, stopVideo, toggleAudio, toggleVideoTrack } from '../utils/webrtc';
+import { Video, VideoOff, Mic, MicOff } from 'lucide-react';
+import { RTCManager, getLocalStream, startVideo, toggleAudio, toggleVideoTrack } from '../utils/webrtc';
 import { getSocket } from '../utils/socket';
 import { useNotification } from '../contexts/NotificationContext';
 
 interface VideoPanelProps {
   onStartVideo: () => void;
-  onEndCall: () => void;
   players?: Array<{ id: string; username: string }>;
   currentUserId?: string;
   roomId?: string;
@@ -14,7 +13,6 @@ interface VideoPanelProps {
 
 export default function VideoPanel({ 
   onStartVideo, 
-  onEndCall, 
   players, 
   currentUserId,
   roomId 
@@ -308,25 +306,6 @@ export default function VideoPanel({
     toggleAudio(!newMutedState);
   };
 
-  const handleEndCall = () => {
-    if (rtcManagerRef.current) {
-      rtcManagerRef.current.destroy();
-      rtcManagerRef.current = null;
-    }
-    stopVideo();
-    if (localVideoRef.current) {
-      localVideoRef.current.srcObject = null;
-    }
-    if (remoteVideoRef.current) {
-      remoteVideoRef.current.srcObject = null;
-    }
-    setIsVideoOn(false);
-    setHasRemoteVideo(false);
-    setIsMuted(false);
-    setIsConnecting(false);
-    onEndCall();
-  };
-
   const getOpponentUsername = () => {
     if (!currentUserId || !players || players.length < 2) return 'Opponent';
     const opponent = players.find((p) => p.id !== currentUserId);
@@ -337,7 +316,7 @@ export default function VideoPanel({
   const opponentInitial = opponentUsername[0]?.toUpperCase() || 'O';
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-4 mt-4">
+    <div className="bg-white rounded-2xl shadow-lg p-4 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-semibold text-gray-800">Video Chat</h3>
         {isConnecting && (
@@ -345,7 +324,7 @@ export default function VideoPanel({
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 mb-4">
+      <div className="flex-1 grid grid-cols-2 gap-3 mb-4 min-h-0">
         {/* Local Video */}
         <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center relative overflow-hidden">
           <video 
@@ -423,14 +402,6 @@ export default function VideoPanel({
           title={isMuted ? 'Unmute' : 'Mute'}
         >
           {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-        </button>
-
-        <button
-          onClick={handleEndCall}
-          className="p-3 rounded-full bg-red-600 text-white hover:bg-red-700 transition-colors"
-          title="End call"
-        >
-          <PhoneOff className="w-5 h-5" />
         </button>
       </div>
     </div>

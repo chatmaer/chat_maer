@@ -68,8 +68,8 @@ export default function TicTacToeBoard({ gameState, playerTeam, isMyTurn, player
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-6">
-      <div className="mb-4 text-center">
+    <div className="flex flex-col items-center justify-center p-4 h-full">
+      <div className="mb-3 text-center">
         <p className="text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
         <p className="text-sm text-gray-600 mt-1">{t('game.youAre')} {playerTeam}</p>
       </div>

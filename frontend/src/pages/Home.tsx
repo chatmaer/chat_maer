@@ -73,7 +73,8 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
 
     try {
       // Set the second username (display username for rooms)
-      const response = await fetch('http://localhost:3001/api/auth/set-username', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      const response = await fetch(`${API_URL}/api/auth/set-username`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -145,10 +146,44 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
       
       const handleError = (error: any) => {
         console.error('Error joining room:', error);
-        showNotification(error.message || 'Failed to join room', 'error');
-        socket.off('game_start', handleGameStart);
-        socket.off('waiting_for_player', handleWaiting);
-        socket.off('error', handleError);
+        // If it's an insufficient balance error, still allow navigation (game_start will be sent)
+        // Only prevent navigation for other errors
+        if (!error.insufficientBalance) {
+          let message = error.message || t('gameRoom.failedToJoinRoom');
+          // Use translation if translation key is provided
+          if (error.translationKey) {
+            try {
+              if (error.translationData) {
+                message = t(error.translationKey, error.translationData);
+              } else {
+                message = t(error.translationKey);
+              }
+            } catch (e) {
+              console.warn('Translation failed for key:', error.translationKey);
+            }
+          }
+          showNotification(message, 'error');
+          socket.off('game_start', handleGameStart);
+          socket.off('waiting_for_player', handleWaiting);
+          socket.off('error', handleError);
+        } else {
+          // For insufficient balance, show notification but don't prevent navigation
+          // The game_start event will still be sent, allowing navigation to the room
+          let message = error.message || t('gameRoom.insufficientBalance');
+          // Use translation if translation key is provided
+          if (error.translationKey) {
+            try {
+              if (error.translationData) {
+                message = t(error.translationKey, error.translationData);
+              } else {
+                message = t(error.translationKey);
+              }
+            } catch (e) {
+              console.warn('Translation failed for key:', error.translationKey);
+            }
+          }
+          showNotification(message, 'warning');
+        }
       };
       
       socket.on('game_start', handleGameStart);

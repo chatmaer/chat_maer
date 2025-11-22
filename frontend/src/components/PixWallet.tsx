@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Wallet, ArrowDownCircle, ArrowUpCircle, History, X, QrCode, Copy, Check } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
+import { useTranslation } from 'react-i18next';
 
 interface PixWalletProps {
   userId?: string;
@@ -20,6 +21,7 @@ interface PixTransaction {
 }
 
 export default function PixWallet({ userId, onClose }: PixWalletProps) {
+  const { t } = useTranslation();
   const { showNotification } = useNotification();
   const [balance, setBalance] = useState<number>(0);
   const [pixKey, setPixKey] = useState<string>('');
@@ -112,18 +114,18 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     if (!userId) return;
     const amount = parseFloat(depositAmount);
     if (!amount || amount < 1) {
-      showNotification('Minimum deposit is R$ 1.00', 'error');
+      showNotification(t('wallet.minimumDepositError'), 'error');
       return;
     }
 
     // Validate payer information
     if (!payerEmail || !payerFirstName || !payerLastName) {
-      showNotification('Please fill in all payer information (email, first name, last name)', 'error');
+      showNotification(t('wallet.fillPayerInfo'), 'error');
       return;
     }
 
     if (!payerIdentificationNumber) {
-      showNotification('Please enter your identification number (CPF or CNPJ)', 'error');
+      showNotification(t('wallet.enterIdentification'), 'error');
       return;
     }
 
@@ -149,13 +151,13 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
       const data = await response.json();
 
       if (response.status === 503) {
-        showNotification('Pix integration is not configured', 'info');
+        showNotification(t('wallet.pixNotConfigured'), 'info');
         setIsLoading(false);
         return;
       }
 
       if (!response.ok) {
-        showNotification(data.error || 'Failed to create deposit request', 'error');
+        showNotification(data.error || t('wallet.depositFailed'), 'error');
         setIsLoading(false);
         return;
       }
@@ -164,12 +166,12 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
       setQrCodeBase64(data.qrCodeBase64);
       setQrExpiresAt(data.expiresAt);
       setTransactionId(data.transactionId);
-      showNotification('QR Code generated. Scan to complete payment.', 'success');
+      showNotification(t('wallet.qrCodeGenerated'), 'success');
       
       // Poll for status
       pollDepositStatus(data.transactionId);
     } catch (error) {
-      showNotification('Error creating deposit request', 'error');
+      showNotification(t('wallet.depositFailed'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -187,7 +189,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           const data = await response.json();
           if (data.status === 'completed') {
             clearInterval(interval);
-            showNotification('Deposit completed successfully!', 'success');
+            showNotification(t('wallet.depositCompleted'), 'success');
             setQrCode(null);
             setQrCodeBase64(null);
             setTransactionId(null);
@@ -219,17 +221,17 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
     if (!userId) return;
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount < 1) {
-      showNotification('Minimum withdrawal is R$ 1.00', 'error');
+      showNotification(t('wallet.minimumWithdrawalError'), 'error');
       return;
     }
 
     if (!withdrawPixKey || withdrawPixKey.length < 3) {
-      showNotification('Please enter a valid Pix key', 'error');
+      showNotification(t('wallet.validPixKey'), 'error');
       return;
     }
 
     if (amount > balance) {
-      showNotification('Insufficient balance', 'error');
+      showNotification(t('wallet.insufficientBalance'), 'error');
       return;
     }
 
@@ -244,25 +246,25 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
       const data = await response.json();
 
       if (response.status === 503) {
-        showNotification('Pix integration is not available yet', 'info');
+        showNotification(t('wallet.pixNotAvailable'), 'info');
         setIsLoading(false);
         return;
       }
 
       if (!response.ok) {
-        showNotification(data.error || 'Failed to create withdrawal request', 'error');
+        showNotification(data.error || t('wallet.withdrawalFailed'), 'error');
         setIsLoading(false);
         return;
       }
 
-      showNotification('Withdrawal request submitted', 'success');
+      showNotification(t('wallet.withdrawalRequestSubmitted'), 'success');
       setWithdrawAmount('');
       setWithdrawPixKey('');
       
       // Poll for status
       pollWithdrawalStatus(data.transactionId);
     } catch (error) {
-      showNotification('Error creating withdrawal request', 'error');
+      showNotification(t('wallet.withdrawalFailed'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -279,7 +281,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           const data = await response.json();
           if (data.status === 'completed') {
             clearInterval(interval);
-            showNotification('Withdrawal completed successfully!', 'success');
+            showNotification(t('wallet.withdrawalCompleted'), 'success');
             fetchBalance();
             fetchTransactions();
           } else if (data.status === 'failed') {
@@ -298,7 +300,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
   const handleSavePixKey = async () => {
     if (!userId) return;
     if (!pixKey || pixKey.length < 3) {
-      showNotification('Please enter a valid Pix key', 'error');
+      showNotification(t('wallet.validPixKey'), 'error');
       return;
     }
 
@@ -312,17 +314,17 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
       });
 
       if (response.ok) {
-        showNotification('Pix key saved successfully', 'success');
+        showNotification(t('wallet.pixKeySaved'), 'success');
         setHasPixKey(true);
         if (activeTab === 'withdraw') {
           setWithdrawPixKey(pixKey);
         }
       } else {
         const data = await response.json();
-        showNotification(data.error || 'Failed to save Pix key', 'error');
+        showNotification(data.error || t('wallet.pixKeySaveFailed'), 'error');
       }
     } catch (error) {
-      showNotification('Error saving Pix key', 'error');
+      showNotification(t('wallet.pixKeySaveFailed'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +333,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    showNotification('Copied to clipboard', 'success');
+    showNotification(t('wallet.copiedToClipboard'), 'success');
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -363,12 +365,12 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
         )}
         <div className="text-center py-8">
           <Wallet className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pix Integration</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('wallet.title')}</h2>
           <p className="text-gray-600 mb-4">
-            Pix integration is coming soon!
+            {t('wallet.pixComingSoon')}
           </p>
           <p className="text-sm text-gray-500">
-            This feature will allow you to deposit and withdraw funds using Pix.
+            {t('wallet.pixDescription')}
           </p>
         </div>
       </div>
@@ -390,9 +392,9 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
       <div className="flex items-center gap-3 mb-6">
         <Wallet className="w-8 h-8 text-blue-600" />
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Pix Wallet</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{t('wallet.title')}</h2>
           <div className="flex items-center gap-2 mt-1">
-            <span className="text-sm text-gray-600">Balance:</span>
+            <span className="text-sm text-gray-600">{t('wallet.balance')}</span>
             <span className="text-xl font-bold text-green-600">
               R$ {balance.toFixed(2)}
             </span>
@@ -411,7 +413,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           }`}
         >
           <ArrowDownCircle className="w-4 h-4 inline mr-2" />
-          Deposit
+          {t('wallet.deposit')}
         </button>
         <button
           onClick={() => setActiveTab('withdraw')}
@@ -422,7 +424,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           }`}
         >
           <ArrowUpCircle className="w-4 h-4 inline mr-2" />
-          Withdraw
+          {t('wallet.withdraw')}
         </button>
         <button
           onClick={() => setActiveTab('history')}
@@ -433,7 +435,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           }`}
         >
           <History className="w-4 h-4 inline mr-2" />
-          History
+          {t('wallet.history')}
         </button>
         <button
           onClick={() => setActiveTab('settings')}
@@ -443,7 +445,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
               : 'text-gray-600 hover:text-gray-900'
           }`}
         >
-          Settings
+          {t('wallet.settings')}
         </button>
       </div>
 
@@ -453,7 +455,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           {qrCode ? (
             <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-6 text-center">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                Scan QR Code to Complete Payment
+                {t('wallet.scanQrCode')}
               </h3>
               {qrCodeBase64 && (
                 <div className="mb-4">
@@ -465,7 +467,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                 </div>
               )}
               <div className="bg-white p-4 rounded-lg mb-4">
-                <p className="text-xs text-gray-600 mb-2">Pix Copy & Paste Code:</p>
+                <p className="text-xs text-gray-600 mb-2">{t('wallet.pixCopyPaste')}</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs break-all p-2 bg-gray-100 rounded">
                     {qrCode}
@@ -480,7 +482,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
               </div>
               {qrExpiresAt && (
                 <p className="text-sm text-gray-600">
-                  Expires at: {new Date(qrExpiresAt).toLocaleString()}
+                  {t('wallet.expiresAt')} {new Date(qrExpiresAt).toLocaleString()}
                 </p>
               )}
               <button
@@ -491,14 +493,14 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                 }}
                 className="mt-4 px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition-colors"
               >
-                Cancel
+                {t('common.cancel')}
               </button>
             </div>
           ) : (
             <>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Deposit Amount (BRL)
+                  {t('wallet.depositAmount')}
                 </label>
                 <input
                   type="number"
@@ -509,16 +511,16 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                   placeholder="0.00"
                   className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-lg"
                 />
-                <p className="text-xs text-gray-500 mt-1">Minimum: R$ 1.00</p>
+                <p className="text-xs text-gray-500 mt-1">{t('wallet.minimumDeposit')}</p>
               </div>
 
               <div className="border-t border-gray-200 pt-4 mt-4">
-                <h3 className="text-sm font-semibold text-gray-900 mb-3">Payer Information</h3>
+                <h3 className="text-sm font-semibold text-gray-900 mb-3">{t('wallet.payerInformation')}</h3>
                 
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      First Name *
+                      {t('wallet.firstName')}
                     </label>
                     <input
                       type="text"
@@ -531,7 +533,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Last Name *
+                      {t('wallet.lastName')}
                     </label>
                     <input
                       type="text"
@@ -546,7 +548,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
 
                 <div className="mb-3">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email *
+                    {t('wallet.email')}
                   </label>
                   <input
                     type="email"
@@ -561,7 +563,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Identification Type *
+                      {t('wallet.identificationType')}
                     </label>
                     <select
                       value={payerIdentificationType}
@@ -574,7 +576,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {payerIdentificationType} Number *
+                      {t('wallet.identificationNumber', { type: payerIdentificationType })}
                     </label>
                     <input
                       type="text"
@@ -602,7 +604,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                 className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-4"
               >
                 <QrCode className="w-5 h-5" />
-                {isLoading ? 'Generating QR Code...' : 'Generate Pix QR Code'}
+                {isLoading ? t('wallet.generatingQrCode') : t('wallet.generateQrCode')}
               </button>
             </>
           )}
@@ -614,7 +616,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Withdrawal Amount (BRL)
+              {t('wallet.withdrawalAmount')}
             </label>
             <input
               type="number"
@@ -627,23 +629,23 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-lg"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Available: R$ {balance.toFixed(2)} | Minimum: R$ 1.00
+              {t('wallet.available')} R$ {balance.toFixed(2)} | {t('wallet.minimumWithdrawal')}
             </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Pix Key
+              {t('wallet.pixKey')}
             </label>
             <input
               type="text"
               value={withdrawPixKey || (hasPixKey ? pixKey : '')}
               onChange={(e) => setWithdrawPixKey(e.target.value)}
-              placeholder="CPF, email, phone, or random key"
+              placeholder={t('wallet.pixKeyPlaceholder')}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
             />
             {hasPixKey && (
               <p className="text-xs text-gray-500 mt-1">
-                Using saved Pix key. You can change it above.
+                {t('wallet.usingSavedPixKey')}
               </p>
             )}
           </div>
@@ -659,7 +661,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
             className="w-full bg-gradient-to-r from-green-600 to-emerald-500 text-white py-3 rounded-xl font-semibold hover:from-green-700 hover:to-emerald-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <ArrowUpCircle className="w-5 h-5" />
-            {isLoading ? 'Processing...' : 'Request Withdrawal'}
+            {isLoading ? t('wallet.processing') : t('wallet.requestWithdrawal')}
           </button>
         </div>
       )}
@@ -670,7 +672,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
           {transactions.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <History className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-              <p>No transactions yet</p>
+              <p>{t('wallet.noTransactions')}</p>
             </div>
           ) : (
             transactions.map((tx) => (
@@ -687,7 +689,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
                     )}
                     <div>
                       <p className="font-semibold text-gray-900">
-                        {tx.type === 'deposit' ? 'Deposit' : 'Withdrawal'}
+                        {tx.type === 'deposit' ? t('wallet.deposit') : t('wallet.withdraw')}
                       </p>
                       <p className="text-sm text-gray-500">
                         {new Date(tx.createdAt).toLocaleString()}
@@ -728,17 +730,17 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Your Pix Key
+              {t('wallet.yourPixKey')}
             </label>
             <input
               type="text"
               value={pixKey}
               onChange={(e) => setPixKey(e.target.value)}
-              placeholder="CPF, email, phone, or random key"
+              placeholder={t('wallet.pixKeyPlaceholder')}
               className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Save your Pix key for faster withdrawals
+              {t('wallet.savePixKeyDescription')}
             </p>
           </div>
           <button
@@ -746,7 +748,7 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
             disabled={isLoading || !pixKey || pixKey.length < 3}
             className="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? 'Saving...' : 'Save Pix Key'}
+            {isLoading ? t('wallet.saving') : t('wallet.savePixKey')}
           </button>
         </div>
       )}

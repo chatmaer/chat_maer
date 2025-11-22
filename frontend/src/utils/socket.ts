@@ -18,7 +18,19 @@ const showNotification = (message: string, type: 'error' | 'success' | 'info' | 
 
 let socket: Socket | null = null;
 
-export const connectSocket = (url: string = 'http://localhost:3001'): Socket => {
+// Get backend URL from environment variable, fallback to localhost for development
+const getBackendUrl = (): string => {
+  const apiUrl = import.meta.env.VITE_API_URL;
+  if (apiUrl) {
+    // Remove /api suffix if present, Socket.io connects to root
+    return apiUrl.replace(/\/api$/, '');
+  }
+  // Default to localhost for development
+  return 'http://localhost:3001';
+};
+
+export const connectSocket = (url?: string): Socket => {
+  const backendUrl = url || getBackendUrl();
   if (!socket || !socket.connected) {
     // If socket exists but is disconnected, clean it up first
     if (socket) {
@@ -115,13 +127,8 @@ export const emitMove = (gameType: string, move: unknown) => {
     console.log('emitMove called:', { gameType, move, socketConnected: socket.connected });
     socket.emit('player_move', { gameType, move });
     
-    // Listen for error response
-    socket.once('error', (error: any) => {
-      console.error('Move error:', error);
-      if (error.message) {
-        showNotification(`Move failed: ${error.message}`, 'error');
-      }
-    });
+    // Don't listen for error here - let the general error handler in GameRoom handle it
+    // This prevents duplicate error messages
   } else {
     console.error('Cannot emit move - socket is null');
     showNotification('Not connected to server. Please refresh the page.', 'error');

@@ -31,7 +31,7 @@ export default function GameBoard({ gameType, gameState, playerTeam, isMyTurn, p
   const serverGameType = gameTypeMap[gameType] || gameType;
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6 min-h-[500px]">
+    <div className="bg-white rounded-2xl shadow-lg p-4 h-full flex flex-col">
       {gameType === 'tic-tac-toe' && (
         <TicTacToeBoard
           gameState={gameState}

@@ -1,7 +1,7 @@
--- Database: real_skills
+-- Database: chat_maer
 
-CREATE DATABASE IF NOT EXISTS real_skills;
-USE real_skills;
+CREATE DATABASE IF NOT EXISTS chat_maer;
+USE chat_maer;
 
 -- Users table
 CREATE TABLE IF NOT EXISTS users (

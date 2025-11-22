@@ -1,5 +1,6 @@
 import { Users, Circle, Square, Crown, ArrowLeft } from 'lucide-react';
 import Header from '../components/Header';
+import { useTranslation } from 'react-i18next';
 
 interface Room {
   id: string;
@@ -16,6 +17,7 @@ interface LobbyProps {
 }
 
 export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
+  const { t } = useTranslation();
   const activeRooms: Room[] = [
     {
       id: '1',
@@ -80,19 +82,19 @@ export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
           >
             <ArrowLeft className="w-5 h-5" />
-            Back to Home
+            {t('lobby.backToHome')}
           </button>
 
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-4xl font-bold text-gray-900 mb-2">Active Rooms</h2>
-              <p className="text-gray-600">Join an existing game or create your own</p>
+              <h2 className="text-4xl font-bold text-gray-900 mb-2">{t('lobby.title')}</h2>
+              <p className="text-gray-600">{t('lobby.description')}</p>
             </div>
             <div className="bg-white px-6 py-3 rounded-xl shadow-lg">
               <div className="flex items-center gap-2">
                 <Users className="w-5 h-5 text-blue-600" />
                 <span className="font-semibold text-gray-900">
-                  {activeRooms.length} rooms active
+                  {t('lobby.roomsActive', { count: activeRooms.length })}
                 </span>
               </div>
             </div>
@@ -102,15 +104,15 @@ export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
         {activeRooms.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
             <Users className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">No Active Rooms</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{t('lobby.noActiveRooms')}</h3>
             <p className="text-gray-600 mb-6">
-              Be the first to create a game room!
+              {t('lobby.beFirstToCreate')}
             </p>
             <button
               onClick={() => onNavigate('home')}
               className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 text-white rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300"
             >
-              Create Room
+              {t('lobby.createRoom')}
             </button>
           </div>
         ) : (
@@ -139,7 +141,7 @@ export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
                           : 'bg-green-100 text-green-700'
                       }`}
                     >
-                      {isFull ? 'Full' : 'Open'}
+                      {isFull ? t('lobby.full') : t('lobby.open')}
                     </div>
                   </div>
 
@@ -150,7 +152,7 @@ export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
                   {room.keyword && (
                     <div className="mb-3 px-3 py-1 bg-gray-100 rounded-lg inline-block">
                       <span className="text-xs text-gray-600">
-                        Keyword: <span className="font-semibold">{room.keyword}</span>
+                        {t('lobby.keyword')} <span className="font-semibold">{room.keyword}</span>
                       </span>
                     </div>
                   )}
@@ -158,7 +160,7 @@ export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
                   <div className="flex items-center gap-2 mb-4">
                     <Users className="w-4 h-4 text-gray-400" />
                     <span className="text-sm text-gray-600">
-                      {room.players}/{room.maxPlayers} players
+                      {room.players}/{room.maxPlayers} {t('lobby.players')}
                     </span>
                   </div>
 
@@ -171,7 +173,7 @@ export default function Lobby({ onNavigate, isConnected, userId }: LobbyProps) {
                         : 'bg-gradient-to-r from-blue-600 to-cyan-500 text-white hover:from-blue-700 hover:to-cyan-600 shadow-lg hover:shadow-xl'
                     }`}
                   >
-                    {isFull ? 'Room Full' : 'Join Room'}
+                    {isFull ? t('lobby.roomFull') : t('lobby.joinRoom')}
                   </button>
                 </div>
               );

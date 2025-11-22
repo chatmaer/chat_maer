@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Users, Ban, CheckCircle, DollarSign, Search, RefreshCw, Shield, AlertTriangle, TrendingUp, LogOut } from 'lucide-react';
 import { useNotification } from '../contexts/NotificationContext';
 import { useDialog } from '../hooks/useDialog';
+import { useTranslation } from 'react-i18next';
 
 interface User {
   id: string;
@@ -50,6 +51,7 @@ interface Stats {
 }
 
 export default function AdminPanel() {
+  const { t } = useTranslation();
   const { showNotification } = useNotification();
   const { showConfirm, showPrompt, DialogComponent } = useDialog();
   const [users, setUsers] = useState<User[]>([]);
@@ -99,14 +101,14 @@ export default function AdminPanel() {
       } else {
         const error = await response.json();
         if (error.error === 'Admin access required') {
-          showNotification('Admin access required', 'error');
+          showNotification(t('admin.adminAccessRequired'), 'error');
           window.location.href = '/';
         } else {
-          showNotification(error.error || 'Failed to fetch users', 'error');
+          showNotification(error.error || t('admin.errorFetchingUsers'), 'error');
         }
       }
     } catch (error) {
-      showNotification('Error fetching users', 'error');
+      showNotification(t('admin.errorFetchingUsers'), 'error');
     } finally {
       setLoading(false);
     }
@@ -132,14 +134,14 @@ export default function AdminPanel() {
       } else {
         const error = await response.json();
         if (error.error === 'Admin access required') {
-          showNotification('Admin access required', 'error');
+          showNotification(t('admin.adminAccessRequired'), 'error');
           window.location.href = '/';
         } else {
-          showNotification(error.error || 'Failed to fetch reports', 'error');
+          showNotification(error.error || t('admin.errorFetchingReports'), 'error');
         }
       }
     } catch (error) {
-      showNotification('Error fetching reports', 'error');
+      showNotification(t('admin.errorFetchingReports'), 'error');
     } finally {
       setLoading(false);
     }
@@ -167,12 +169,12 @@ export default function AdminPanel() {
     const { authenticatedFetch } = await import('../utils/api');
     if (!userId) return;
     
-    const reason = await showPrompt(`Enter ban reason for ${username}:`, {
-      title: 'Ban User',
+    const reason = await showPrompt(t('admin.enterBanReason', { username }), {
+      title: t('admin.banUser'),
       type: 'warning',
-      placeholder: 'Enter ban reason...',
-      confirmText: 'Ban',
-      cancelText: 'Cancel',
+      placeholder: t('admin.banReasonPlaceholder'),
+      confirmText: t('admin.ban'),
+      cancelText: t('common.cancel'),
     });
     
     if (!reason) return;
@@ -187,15 +189,15 @@ export default function AdminPanel() {
       });
 
       if (response.ok) {
-        showNotification(`User ${username} banned successfully`, 'success');
+        showNotification(t('admin.userBannedSuccess', { username }), 'success');
         fetchUsers();
         fetchStats();
       } else {
         const error = await response.json();
-        showNotification(error.error || 'Failed to ban user', 'error');
+        showNotification(error.error || t('admin.failedToBanUser'), 'error');
       }
     } catch (error) {
-      showNotification('Error banning user', 'error');
+      showNotification(t('admin.errorBanningUser'), 'error');
     }
   };
 
@@ -203,11 +205,11 @@ export default function AdminPanel() {
     const { authenticatedFetch } = await import('../utils/api');
     if (!userId) return;
     
-    const confirmed = await showConfirm(`Unban user ${username}?`, {
-      title: 'Unban User',
+    const confirmed = await showConfirm(t('admin.unbanUserConfirm', { username }), {
+      title: t('admin.unbanUser'),
       type: 'info',
-      confirmText: 'Unban',
-      cancelText: 'Cancel',
+      confirmText: t('admin.unban'),
+      cancelText: t('common.cancel'),
     });
     
     if (!confirmed) return;
@@ -221,35 +223,35 @@ export default function AdminPanel() {
       });
 
       if (response.ok) {
-        showNotification(`User ${username} unbanned successfully`, 'success');
+        showNotification(t('admin.userUnbannedSuccess', { username }), 'success');
         fetchUsers();
         fetchStats();
       } else {
         const error = await response.json();
-        showNotification(error.error || 'Failed to unban user', 'error');
+        showNotification(error.error || t('admin.failedToUnbanUser'), 'error');
       }
     } catch (error) {
-      showNotification('Error unbanning user', 'error');
+      showNotification(t('admin.errorUnbanningUser'), 'error');
     }
   };
 
   const handleUpdateBalance = async (targetUserId: string, username: string, currentBalance: number) => {
     if (!userId) return;
     
-    const newBalanceStr = await showPrompt(`Enter new balance for ${username} (current: R$ ${currentBalance.toFixed(2)}):`, {
-      title: 'Update Balance',
+    const newBalanceStr = await showPrompt(t('admin.enterNewBalance', { username, current: currentBalance.toFixed(2) }), {
+      title: t('admin.updateBalanceTitle'),
       type: 'info',
-      placeholder: `Current: R$ ${currentBalance.toFixed(2)}`,
+      placeholder: t('admin.currentBalancePlaceholder', { amount: currentBalance.toFixed(2) }),
       defaultValue: currentBalance.toFixed(2),
-      confirmText: 'Update',
-      cancelText: 'Cancel',
+      confirmText: t('common.update'),
+      cancelText: t('common.cancel'),
     });
     
     if (!newBalanceStr) return;
 
     const balance = parseFloat(newBalanceStr);
     if (isNaN(balance) || balance < 0) {
-      showNotification('Invalid balance amount', 'error');
+      showNotification(t('admin.invalidBalanceAmount'), 'error');
       return;
     }
 
@@ -264,14 +266,14 @@ export default function AdminPanel() {
       });
 
       if (response.ok) {
-        showNotification(`Balance updated for ${username}`, 'success');
+        showNotification(t('admin.balanceUpdatedSuccess', { username }), 'success');
         fetchUsers();
       } else {
         const error = await response.json();
-        showNotification(error.error || 'Failed to update balance', 'error');
+        showNotification(error.error || t('admin.failedToUpdateBalance'), 'error');
       }
     } catch (error) {
-      showNotification('Error updating balance', 'error');
+      showNotification(t('admin.errorUpdatingBalance'), 'error');
     }
   };
 
@@ -286,8 +288,8 @@ export default function AdminPanel() {
             <div className="flex items-center gap-3">
               <Shield className="w-8 h-8 text-red-600" />
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Admin Panel</h1>
-                <p className="text-sm text-gray-600">User Management & System Control</p>
+                <h1 className="text-2xl font-bold text-gray-900">{t('admin.title')}</h1>
+                <p className="text-sm text-gray-600">{t('admin.subtitle')}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -296,11 +298,11 @@ export default function AdminPanel() {
               </span>
               <button
                 onClick={async () => {
-                  const confirmed = await showConfirm('Are you sure you want to logout?', {
-                    title: 'Logout',
+                  const confirmed = await showConfirm(t('admin.logoutConfirm'), {
+                    title: t('admin.logout'),
                     type: 'warning',
-                    confirmText: 'Logout',
-                    cancelText: 'Cancel',
+                    confirmText: t('admin.logout'),
+                    cancelText: t('common.cancel'),
                   });
                   
                   if (confirmed) {
@@ -314,7 +316,7 @@ export default function AdminPanel() {
                 className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
               >
                 <LogOut className="w-4 h-4" />
-                Logout
+                {t('admin.logout')}
               </button>
             </div>
           </div>
@@ -328,20 +330,20 @@ export default function AdminPanel() {
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-blue-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Users</p>
+                  <p className="text-sm text-gray-600">{t('admin.totalUsers')}</p>
                   <p className="text-2xl font-bold text-gray-900">{stats.users.total}</p>
                 </div>
                 <Users className="w-8 h-8 text-blue-500" />
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                {stats.users.active} active, {stats.users.banned} banned
+                {stats.users.active} {t('admin.activeUsers')}, {stats.users.banned} {t('admin.bannedUsers')}
               </p>
             </div>
 
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Total Reports</p>
+                  <p className="text-sm text-gray-600">{t('admin.totalReports')}</p>
                   <p className="text-2xl font-bold text-gray-900">{stats.reports.total}</p>
                 </div>
                 <AlertTriangle className="w-8 h-8 text-red-500" />
@@ -351,7 +353,7 @@ export default function AdminPanel() {
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
               <div className="flex items-center justify-between">
                  <div>
-                   <p className="text-sm text-gray-600">Total Balance</p>
+                   <p className="text-sm text-gray-600">{t('admin.totalBalance')}</p>
                    <p className="text-2xl font-bold text-gray-900">
                      R$ {typeof stats.balance.total === 'number' 
                        ? stats.balance.total.toFixed(2) 
@@ -365,13 +367,13 @@ export default function AdminPanel() {
             <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-purple-500">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Active Rooms</p>
+                  <p className="text-sm text-gray-600">{t('admin.activeRooms')}</p>
                   <p className="text-2xl font-bold text-gray-900">{stats.rooms.active}</p>
                 </div>
                 <TrendingUp className="w-8 h-8 text-purple-500" />
               </div>
               <p className="text-xs text-gray-500 mt-2">
-                {stats.rooms.total} total rooms
+                {stats.rooms.total} {t('admin.totalRooms')}
               </p>
             </div>
           </div>
@@ -393,7 +395,7 @@ export default function AdminPanel() {
               }`}
             >
               <Users className="w-5 h-5 inline mr-2" />
-              Users
+              {t('admin.users')}
             </button>
             <button
               onClick={() => {
@@ -407,7 +409,7 @@ export default function AdminPanel() {
               }`}
             >
               <AlertTriangle className="w-5 h-5 inline mr-2" />
-              Reports
+              {t('admin.reports')}
             </button>
             <button
               onClick={() => {
@@ -421,7 +423,7 @@ export default function AdminPanel() {
               }`}
             >
               <TrendingUp className="w-5 h-5 inline mr-2" />
-              Statistics
+              {t('admin.statistics')}
             </button>
           </div>
 
@@ -438,7 +440,7 @@ export default function AdminPanel() {
                       setSearchQuery(e.target.value);
                       setCurrentPage(1);
                     }}
-                    placeholder="Search users by username or ID..."
+                    placeholder={t('admin.searchPlaceholder')}
                     className="w-full pl-10 pr-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
                   />
                 </div>
@@ -447,7 +449,7 @@ export default function AdminPanel() {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Refresh
+                  {t('admin.refresh')}
                 </button>
               </div>
 
@@ -458,7 +460,7 @@ export default function AdminPanel() {
               ) : users.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <p>No users found</p>
+                  <p>{t('admin.noUsersFound')}</p>
                 </div>
               ) : (
                 <>
@@ -466,12 +468,12 @@ export default function AdminPanel() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Username</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Balance</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Type</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Reports</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Actions</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.username')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.balance')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.type')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.status')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.reportsCount')}</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -503,12 +505,12 @@ export default function AdminPanel() {
                             {user.isBanned ? (
                               <span className="px-2 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
                                 <Ban className="w-3 h-3" />
-                                Banned
+                                {t('admin.banned')}
                               </span>
                             ) : (
                               <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold flex items-center gap-1 w-fit">
                                 <CheckCircle className="w-3 h-3" />
-                                Active
+                                {t('admin.active')}
                               </span>
                             )}
                           </td>
@@ -522,21 +524,21 @@ export default function AdminPanel() {
                                   onClick={() => handleUnbanUser(user.id, user.username)}
                                   className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors"
                                 >
-                                  Unban
+                                  {t('admin.unban')}
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleBanUser(user.id, user.username)}
                                   className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors"
                                 >
-                                  Ban
+                                  {t('admin.ban')}
                                 </button>
                               )}
                               <button
                                 onClick={() => handleUpdateBalance(user.id, user.username, user.balance)}
                                 className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
                               >
-                                Balance
+                                {t('admin.updateBalance')}
                               </button>
                             </div>
                           </td>
@@ -552,17 +554,17 @@ export default function AdminPanel() {
                         disabled={currentPage === 1}
                         className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Previous
+                        {t('admin.previous')}
                       </button>
                       <span className="text-sm text-gray-600">
-                        Page {currentPage} of {totalPages}
+                        {t('admin.page', { current: currentPage, total: totalPages })}
                       </span>
                       <button
                         onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                         disabled={currentPage === totalPages}
                         className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        Next
+                        {t('admin.next')}
                       </button>
                     </div>
                   )}
@@ -575,13 +577,13 @@ export default function AdminPanel() {
           {activeTab === 'reports' && (
             <div className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">User Reports</h3>
+                <h3 className="text-lg font-semibold text-gray-900">{t('admin.userReports')}</h3>
                 <button
                   onClick={fetchReports}
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
-                  Refresh
+                  {t('admin.refresh')}
                 </button>
               </div>
 
@@ -592,7 +594,7 @@ export default function AdminPanel() {
               ) : reports.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <p>No reports found</p>
+                  <p>{t('admin.noReportsFound')}</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -604,10 +606,10 @@ export default function AdminPanel() {
                       <div className="flex items-start justify-between mb-2">
                         <div>
                           <p className="font-semibold text-gray-900">
-                            Reported: <span className="text-red-600">{report.reportedUsername}</span>
+                            {t('admin.reported')} <span className="text-red-600">{report.reportedUsername}</span>
                           </p>
                           <p className="text-sm text-gray-600">
-                            By: <span className="text-gray-900">{report.reporterUsername}</span>
+                            {t('admin.by')} <span className="text-gray-900">{report.reporterUsername}</span>
                           </p>
                         </div>
                         <span className="text-xs text-gray-500">
@@ -616,7 +618,7 @@ export default function AdminPanel() {
                       </div>
                       <p className="text-gray-700 mt-2">{report.reason}</p>
                       {report.roomId && (
-                        <p className="text-xs text-gray-500 mt-2">Room ID: {report.roomId}</p>
+                        <p className="text-xs text-gray-500 mt-2">{t('admin.roomId')} {report.roomId}</p>
                       )}
                     </div>
                   ))}
@@ -628,53 +630,53 @@ export default function AdminPanel() {
           {/* Stats Tab */}
           {activeTab === 'stats' && stats && (
             <div className="p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">System Statistics</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">{t('admin.systemStatistics')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">Users</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">{t('admin.usersSection')}</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Total Users:</span>
+                      <span className="text-gray-600">{t('admin.totalUsersLabel')}</span>
                       <span className="font-semibold">{stats.users.total}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Active Users:</span>
+                      <span className="text-gray-600">{t('admin.activeUsersLabel')}</span>
                       <span className="font-semibold text-green-600">{stats.users.active}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Banned Users:</span>
+                      <span className="text-gray-600">{t('admin.bannedUsersLabel')}</span>
                       <span className="font-semibold text-red-600">{stats.users.banned}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">Content</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">{t('admin.contentSection')}</h4>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Total Reports:</span>
+                      <span className="text-gray-600">{t('admin.totalReportsLabel')}</span>
                       <span className="font-semibold">{stats.reports.total}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Total Rooms:</span>
+                      <span className="text-gray-600">{t('admin.totalRoomsLabel')}</span>
                       <span className="font-semibold">{stats.rooms.total}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Active Rooms:</span>
+                      <span className="text-gray-600">{t('admin.activeRoomsLabel')}</span>
                       <span className="font-semibold text-green-600">{stats.rooms.active}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Total Matches:</span>
+                      <span className="text-gray-600">{t('admin.totalMatchesLabel')}</span>
                       <span className="font-semibold">{stats.matches.total}</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3">Financial</h4>
+                  <h4 className="font-semibold text-gray-900 mb-3">{t('admin.financialSection')}</h4>
                   <div className="space-y-2 text-sm">
                      <div className="flex justify-between">
-                       <span className="text-gray-600">Total Platform Balance:</span>
+                       <span className="text-gray-600">{t('admin.totalPlatformBalance')}</span>
                        <span className="font-semibold text-green-600">
                          R$ {typeof stats.balance.total === 'number' 
                            ? stats.balance.total.toFixed(2) 

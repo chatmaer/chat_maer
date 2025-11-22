@@ -48,7 +48,8 @@ function AppContent() {
 
     if (storedToken && storedUserId && storedUsername) {
       // Verify token is still valid
-      fetch('http://localhost:3001/api/auth/verify', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+      fetch(`${API_URL}/api/auth/verify`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -53,6 +53,125 @@ const rematchRequests = new Map<string, Set<string>>(); // roomId -> Set of user
 const userSessions = new Map<string, string>(); // userId -> socketId
 const socketToUser = new Map<string, string>(); // socketId -> userId (reverse mapping)
 
+// Track last time insufficient balance error was shown per room to prevent duplicates
+const lastInsufficientBalanceError = new Map<string, number>(); // roomId -> timestamp
+const INSUFFICIENT_BALANCE_ERROR_COOLDOWN = 5000; // 5 seconds
+
+/**
+ * Check if all players in a room have sufficient balance to cover the betting amount
+ * @param players Array of players in the room
+ * @param bettingAmount The betting amount required
+ * @returns Object with isValid flag and array of players with insufficient balance
+ */
+const checkPlayersBalance = async (
+  players: Array<{ id: string; username: string }>,
+  bettingAmount: number,
+): Promise<{ isValid: boolean; insufficientPlayers: Array<{ id: string; username: string; balance: number }> }> => {
+  const insufficientPlayers: Array<{ id: string; username: string; balance: number }> = [];
+  
+  // Ensure bettingAmount is a number
+  const requiredAmount = typeof bettingAmount === 'number' ? bettingAmount : Number(bettingAmount || 0.25);
+  
+  for (const player of players) {
+    const balance = await getUserBalance(player.id);
+    // Use Number() to ensure proper comparison and handle floating point precision
+    const playerBalance = typeof balance === 'number' ? balance : Number(balance || 0);
+    
+    // Strict check: balance must be >= bettingAmount (with small epsilon for floating point)
+    if (playerBalance < requiredAmount - 0.001) {
+      insufficientPlayers.push({
+        id: player.id,
+        username: player.username,
+        balance: playerBalance,
+      });
+      
+      logger.warn(
+        { userId: player.id, username: player.username, balance: playerBalance, requiredAmount },
+        "Player has insufficient balance",
+      );
+    }
+  }
+  
+  const isValid = insufficientPlayers.length === 0;
+  
+  if (!isValid) {
+    logger.warn(
+      { insufficientPlayers, requiredAmount },
+      "Balance check failed - not all players have sufficient balance",
+    );
+  }
+  
+  return {
+    isValid,
+    insufficientPlayers,
+  };
+};
+
+/**
+ * Attempt to start the game if both players are present and have sufficient balance
+ * @param io Socket.IO server instance
+ * @param roomId Room ID to check
+ * @returns true if game was started, false otherwise
+ */
+const attemptGameStart = async (io: Server, roomId: string): Promise<boolean> => {
+  try {
+    // Get room status
+    const roomInfo = (await query(
+      "SELECT game_type, status FROM rooms WHERE id = ?",
+      [roomId],
+    )) as Array<{ game_type: string; status: string }>;
+    
+    if (roomInfo.length === 0 || roomInfo[0].status !== "waiting") {
+      return false; // Room doesn't exist or is not waiting
+    }
+    
+    const gameType = roomInfo[0].game_type;
+    const players = await getRoomPlayers(roomId);
+    
+    if (players.length !== 2) {
+      return false; // Not enough players
+    }
+    
+    const bettingInfo = await getRoomBettingInfo(roomId);
+    const bettingAmount = bettingInfo?.betting_amount || 0.25;
+    
+    // Check if all players have sufficient balance
+    const balanceCheck = await checkPlayersBalance(players, bettingAmount);
+    
+    if (!balanceCheck.isValid) {
+      return false; // Not all players have sufficient balance
+    }
+    
+    // All conditions met - start the game
+    const game = getGame(roomId);
+    if (!game) {
+      const newGame = initializeGame(gameType as GameType);
+      setGame(roomId, newGame);
+    }
+    const gameState = getGameState(getGame(roomId)!);
+    
+    await updateRoomStatus(roomId, "playing");
+    
+    setTimeout(() => {
+      io.to(roomId).emit("game_start", {
+        roomId,
+        gameType,
+        players,
+        gameState,
+        canMove: true,
+        bettingAmount,
+        bettingStatus: bettingInfo?.betting_status || "unlocked",
+      });
+    }, 100);
+    
+    logger.info({ roomId, players: players.map(p => p.id) }, "Game started automatically after balance check");
+    return true;
+  } catch (error) {
+    logger.error(error, "Error in attemptGameStart");
+    return false;
+  }
+};
+
 export const setupSocketHandlers = (io: Server): void => {
   io.on("connection", (socket: Socket) => {
     logger.info({ socketId: socket.id }, "User connected");
@@ -243,7 +362,53 @@ export const setupSocketHandlers = (io: Server): void => {
             const gameState = getGameState(game);
 
             const bettingInfo = await getRoomBettingInfo(existingRoom.id);
+            const bettingAmount = bettingInfo?.betting_amount || 0.25;
+            
             if (players.length === 2) {
+              // Check if all players have sufficient balance before starting the game
+              const balanceCheck = await checkPlayersBalance(players, bettingAmount);
+              
+              if (!balanceCheck.isValid) {
+                // Notify all players that game cannot start due to insufficient balance
+                // Keep room status as "waiting" and send waiting_for_player event instead of game_start
+                const insufficientPlayerNames = balanceCheck.insufficientPlayers
+                  .map(p => p.username)
+                  .join(", ");
+                const errorMessage = `Game cannot start: ${insufficientPlayerNames} ${balanceCheck.insufficientPlayers.length === 1 ? 'does' : 'do'} not have sufficient balance (R$ ${bettingAmount.toFixed(2)} required). Please charge your balance to start the game.`;
+                
+                // Send game_start event with canMove: false so users can still navigate to room
+                // But keep room status as "waiting" - do NOT update to "playing"
+                setTimeout(() => {
+                  io.to(existingRoom.id).emit("game_start", {
+                    roomId: existingRoom.id,
+                    gameType,
+                    players,
+                    gameState,
+                    canMove: false, // Disable moves until balance is sufficient
+                    bettingAmount,
+                    bettingStatus: bettingInfo?.betting_status || "unlocked",
+                    insufficientBalance: true,
+                  });
+                  
+              // Also send waiting_for_player to indicate game is waiting for balance
+              io.to(existingRoom.id).emit("waiting_for_player", {
+                roomId: existingRoom.id,
+                players,
+                insufficientBalance: true,
+                message: errorMessage,
+              });
+              
+              // Don't show alert when joining - only show when trying to start game (make a move)
+                }, 100);
+                
+                // IMPORTANT: Do NOT update room status to "playing" - keep it as "waiting"
+                logger.warn(
+                  { roomId: existingRoom.id, insufficientPlayers: balanceCheck.insufficientPlayers },
+                  "Game cannot start due to insufficient balance on rejoin - keeping room status as waiting",
+                );
+                return;
+              }
+              
               await updateRoomStatus(existingRoom.id, "playing");
               // Use setTimeout to ensure socket room join is complete
               setTimeout(() => {
@@ -253,7 +418,7 @@ export const setupSocketHandlers = (io: Server): void => {
                   players,
                   gameState,
                   canMove: true, // Allow moves when 2 players are present
-                  bettingAmount: bettingInfo?.betting_amount || 0.25,
+                  bettingAmount,
                   bettingStatus: bettingInfo?.betting_status || "unlocked",
                 });
               }, 100);
@@ -350,7 +515,53 @@ export const setupSocketHandlers = (io: Server): void => {
         const gameState = getGameState(game);
 
         const bettingInfo = await getRoomBettingInfo(room.id);
+        const bettingAmount = bettingInfo?.betting_amount || 0.25;
+        
         if (players.length === 2) {
+          // Check if all players have sufficient balance before starting the game
+          const balanceCheck = await checkPlayersBalance(players, bettingAmount);
+          
+          if (!balanceCheck.isValid) {
+            // Notify all players that game cannot start due to insufficient balance
+            // Keep room status as "waiting" and send waiting_for_player event instead of game_start
+            const insufficientPlayerNames = balanceCheck.insufficientPlayers
+              .map(p => p.username)
+              .join(", ");
+            const errorMessage = `Game cannot start: ${insufficientPlayerNames} ${balanceCheck.insufficientPlayers.length === 1 ? 'does' : 'do'} not have sufficient balance (R$ ${bettingAmount.toFixed(2)} required). Please charge your balance to start the game.`;
+            
+            // Send game_start event with canMove: false so users can still navigate to room
+            // But keep room status as "waiting" - do NOT update to "playing"
+            setTimeout(() => {
+              io.to(room.id).emit("game_start", {
+                roomId: room.id,
+                gameType,
+                players,
+                gameState,
+                canMove: false, // Disable moves until balance is sufficient
+                bettingAmount,
+                bettingStatus: bettingInfo?.betting_status || "unlocked",
+                insufficientBalance: true,
+              });
+              
+              // Also send waiting_for_player to indicate game is waiting for balance
+              io.to(room.id).emit("waiting_for_player", {
+                roomId: room.id,
+                players,
+                insufficientBalance: true,
+                message: errorMessage,
+              });
+              
+              // Don't show alert when joining - only show when trying to start game (make a move)
+            }, 100);
+            
+            // IMPORTANT: Do NOT update room status to "playing" - keep it as "waiting"
+            logger.warn(
+              { roomId: room.id, insufficientPlayers: balanceCheck.insufficientPlayers },
+              "Game cannot start due to insufficient balance - keeping room status as waiting",
+            );
+            return;
+          }
+          
           await updateRoomStatus(room.id, "playing");
           // Use setTimeout to ensure socket room join is complete
           setTimeout(() => {
@@ -360,7 +571,7 @@ export const setupSocketHandlers = (io: Server): void => {
               players,
               gameState,
               canMove: true, // Allow moves when 2 players are present
-              bettingAmount: bettingInfo?.betting_amount || 0.25,
+              bettingAmount,
               bettingStatus: bettingInfo?.betting_status || "unlocked",
             });
           }, 100);
@@ -457,8 +668,63 @@ export const setupSocketHandlers = (io: Server): void => {
           }
           const gameState = getGameState(game);
           const bettingInfo = await getRoomBettingInfo(room.id);
+          const bettingAmount = bettingInfo?.betting_amount || 0.25;
 
           if (players.length === 2) {
+            // Check if all players have sufficient balance before starting the game
+            const balanceCheck = await checkPlayersBalance(players, bettingAmount);
+            
+            if (!balanceCheck.isValid) {
+              // Notify all players that game cannot start due to insufficient balance
+              // Keep room status as "waiting" and send waiting_for_player event instead of game_start
+              const insufficientPlayerNames = balanceCheck.insufficientPlayers
+                .map(p => p.username)
+                .join(", ");
+              const errorMessage = `Game cannot start: ${insufficientPlayerNames} ${balanceCheck.insufficientPlayers.length === 1 ? 'does' : 'do'} not have sufficient balance (R$ ${bettingAmount.toFixed(2)} required). Please charge your balance to start the game.`;
+              
+              // Send game_start event with canMove: false so users can still navigate to room
+              // But keep room status as "waiting" - do NOT update to "playing"
+              setTimeout(() => {
+                io.to(room.id).emit("game_start", {
+                  roomId: room.id,
+                  gameType,
+                  players,
+                  gameState,
+                  canMove: false, // Disable moves until balance is sufficient
+                  bettingAmount,
+                  bettingStatus: bettingInfo?.betting_status || "unlocked",
+                  insufficientBalance: true,
+                });
+                
+                // Also send waiting_for_player to indicate game is waiting for balance
+                io.to(room.id).emit("waiting_for_player", {
+                  roomId: room.id,
+                  players,
+                  insufficientBalance: true,
+                  message: errorMessage,
+                });
+                
+                // Also send error notification
+                io.to(room.id).emit("error", {
+                  message: errorMessage,
+                  insufficientBalance: true,
+                  bettingAmount,
+                  insufficientPlayers: balanceCheck.insufficientPlayers.map(p => ({
+                    id: p.id,
+                    username: p.username,
+                    balance: p.balance,
+                  })),
+                });
+              }, 100);
+              
+              // IMPORTANT: Do NOT update room status to "playing" - keep it as "waiting"
+              logger.warn(
+                { roomId: room.id, insufficientPlayers: balanceCheck.insufficientPlayers },
+                "Game cannot start due to insufficient balance - keeping room status as waiting",
+              );
+              return;
+            }
+            
             await updateRoomStatus(room.id, "playing");
             // Use setTimeout to ensure socket room join is complete
             setTimeout(() => {
@@ -468,7 +734,7 @@ export const setupSocketHandlers = (io: Server): void => {
                 players,
                 gameState,
                 canMove: true, // Allow moves when 2 players are present
-                bettingAmount: bettingInfo?.betting_amount || 0.25,
+                bettingAmount,
                 bettingStatus: bettingInfo?.betting_status || "unlocked",
               });
             }, 100);
@@ -589,6 +855,58 @@ export const setupSocketHandlers = (io: Server): void => {
         // Check if 2 players are present before allowing moves
         if (players.length < 2) {
           socket.emit("error", { message: "Waiting for another player to join" });
+          return;
+        }
+        
+        // Check room status - moves are only allowed when status is "playing"
+        const roomInfo = (await query(
+          "SELECT status FROM rooms WHERE id = ?",
+          [roomId],
+        )) as Array<{ status: string }>;
+        
+        if (roomInfo.length === 0) {
+          socket.emit("error", { message: "Room not found" });
+          return;
+        }
+        
+        // Check if all players have sufficient balance before allowing moves
+        const bettingInfo = await getRoomBettingInfo(roomId);
+        const bettingAmount = bettingInfo?.betting_amount || 0.25;
+        const balanceCheck = await checkPlayersBalance(players, bettingAmount);
+        
+        // If room is not playing OR balance is insufficient, show alert when trying to start game
+        if (roomInfo[0].status !== "playing" || !balanceCheck.isValid) {
+          // Show alert when user tries to start game (make a move) but balance is insufficient
+          // Only show once per room every 5 seconds to prevent duplicate alerts
+          const now = Date.now();
+          const lastErrorTime = lastInsufficientBalanceError.get(roomId) || 0;
+          
+          if (!balanceCheck.isValid && (now - lastErrorTime) > INSUFFICIENT_BALANCE_ERROR_COOLDOWN) {
+            const insufficientPlayerNames = balanceCheck.insufficientPlayers
+              .map(p => p.username)
+              .join(", ");
+            const isSingle = balanceCheck.insufficientPlayers.length === 1;
+            socket.emit("error", { 
+              message: `Game cannot start: ${insufficientPlayerNames} ${isSingle ? 'does' : 'do'} not have sufficient balance (R$ ${bettingAmount.toFixed(2)} required). Please charge your balance to start the game.`,
+              insufficientBalance: true,
+              translationKey: isSingle ? 'gameRoom.insufficientBalanceToStartSingle' : 'gameRoom.insufficientBalanceToStartMultiple',
+              translationData: {
+                players: insufficientPlayerNames,
+                amount: bettingAmount.toFixed(2),
+              },
+            });
+            lastInsufficientBalanceError.set(roomId, now);
+          } else if (!balanceCheck.isValid) {
+            // Silently reject if we've shown the error recently
+            return;
+          } else {
+            // Room is not playing for other reasons
+            socket.emit("error", { 
+              message: "Game cannot start: insufficient balance. Please charge your balance to start the game.",
+              insufficientBalance: true,
+              translationKey: 'gameRoom.insufficientBalanceGeneric',
+            });
+          }
           return;
         }
         const currentPlayerIndex = players.findIndex(
@@ -1092,6 +1410,7 @@ export const setupSocketHandlers = (io: Server): void => {
         if (data.amount <= 0) {
           socket.emit("error", {
             message: "Betting amount must be greater than 0",
+            translationKey: "betting.amountMustBeGreater",
           });
           return;
         }
@@ -1101,6 +1420,7 @@ export const setupSocketHandlers = (io: Server): void => {
         if (userBalance < data.amount) {
           socket.emit("error", {
             message: "Insufficient balance",
+            translationKey: "betting.insufficientBalance",
           });
           return;
         }
@@ -1198,6 +1518,7 @@ export const setupSocketHandlers = (io: Server): void => {
         if (proposal.length === 0) {
           socket.emit("error", {
             message: "No matching proposal found",
+            translationKey: "betting.noMatchingProposal",
           });
           return;
         }
@@ -1208,6 +1529,10 @@ export const setupSocketHandlers = (io: Server): void => {
           if (playerBalance < data.amount) {
             socket.emit("error", {
               message: `${player.username} has insufficient balance`,
+              translationKey: "betting.playerInsufficientBalance",
+              translationData: {
+                username: player.username,
+              },
             });
             return;
           }
@@ -1328,6 +1653,10 @@ export const setupSocketHandlers = (io: Server): void => {
           userBalance,
           roomId,
         });
+        
+        // After sending betting info, check if game can start automatically
+        // This allows the game to start when both players charge balance
+        await attemptGameStart(io, roomId);
       } catch (error) {
         logger.error(error, "Error in get_betting_info");
         socket.emit("error", { message: "Failed to get betting info" });
@@ -1402,11 +1731,6 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const players = await getRoomPlayers(roomId);
         if (rematchRequests.get(roomId)!.size === players.length) {
-          const game = initializeGame(gameType as GameType);
-          setGame(roomId, game);
-          await updateRoomStatus(roomId, "playing");
-          rematchRequests.delete(roomId);
-
           // Unlock betting for rematch so players can negotiate new amount
           await query(
             `UPDATE rooms SET betting_status = 'unlocked', betting_amount = 0.25 WHERE id = ?`,
@@ -1419,8 +1743,50 @@ export const setupSocketHandlers = (io: Server): void => {
             [roomId],
           );
 
-          const gameState = getGameState(game);
           const bettingInfo = await getRoomBettingInfo(roomId);
+          const bettingAmount = bettingInfo?.betting_amount || 0.25;
+          
+          // Check if all players have sufficient balance before starting rematch
+          const balanceCheck = await checkPlayersBalance(players, bettingAmount);
+          
+          if (!balanceCheck.isValid) {
+            // Notify all players that rematch cannot start due to insufficient balance
+            const insufficientPlayerNames = balanceCheck.insufficientPlayers
+              .map(p => p.username)
+              .join(", ");
+            const errorMessage = `Rematch cannot start: ${insufficientPlayerNames} ${balanceCheck.insufficientPlayers.length === 1 ? 'does' : 'do'} not have sufficient balance (R$ ${bettingAmount.toFixed(2)} required)`;
+            const isSingle = balanceCheck.insufficientPlayers.length === 1;
+            
+            io.to(roomId).emit("error", {
+              message: errorMessage,
+              insufficientBalance: true,
+              translationKey: isSingle ? 'gameRoom.rematchInsufficientBalanceSingle' : 'gameRoom.rematchInsufficientBalanceMultiple',
+              translationData: {
+                players: insufficientPlayerNames,
+                amount: bettingAmount.toFixed(2),
+              },
+              bettingAmount,
+              insufficientPlayers: balanceCheck.insufficientPlayers.map(p => ({
+                id: p.id,
+                username: p.username,
+                balance: p.balance,
+              })),
+            });
+            
+            rematchRequests.delete(roomId);
+            logger.warn(
+              { roomId, insufficientPlayers: balanceCheck.insufficientPlayers },
+              "Rematch cannot start due to insufficient balance",
+            );
+            return;
+          }
+          
+          const game = initializeGame(gameType as GameType);
+          setGame(roomId, game);
+          await updateRoomStatus(roomId, "playing");
+          rematchRequests.delete(roomId);
+
+          const gameState = getGameState(game);
           
           // Get updated balances for all players
           const updatedBalances: Array<{ userId: string; balance: number }> = [];
@@ -1434,7 +1800,7 @@ export const setupSocketHandlers = (io: Server): void => {
             gameType,
             players,
             gameState,
-            bettingAmount: bettingInfo?.betting_amount || 0.25,
+            bettingAmount,
             bettingStatus: bettingInfo?.betting_status || "unlocked",
             balances: updatedBalances,
           });

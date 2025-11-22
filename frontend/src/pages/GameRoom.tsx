@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { RotateCcw, LogOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import Header from '../components/Header';
 import GameBoard from '../components/GameBoard';
 import GameInfoPanel from '../components/GameInfoPanel';
@@ -44,6 +45,7 @@ export default function GameRoom({
   onExitRoom,
   onLogout,
 }: GameRoomProps) {
+  const { t } = useTranslation();
   const { showNotification } = useNotification();
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -149,7 +151,24 @@ export default function GameRoom({
     const handleError = (error: any) => {
       console.error('Socket error:', error);
       if (error.message) {
-        showNotificationRef.current(`Error: ${error.message}`, 'error');
+        // Remove any existing prefixes (Error:, Move failed:) to avoid duplicates
+        let message = error.message.replace(/^(Error:|Move failed:)\s*/i, '');
+        
+        // Use translation if translation key is provided
+        if (error.translationKey) {
+          try {
+            if (error.translationData) {
+              message = t(error.translationKey, error.translationData);
+            } else {
+              message = t(error.translationKey);
+            }
+          } catch (e) {
+            // Fallback to original message if translation fails
+            console.warn('Translation failed for key:', error.translationKey);
+          }
+        }
+        
+        showNotificationRef.current(message, 'error');
       }
     };
     
@@ -547,20 +566,22 @@ export default function GameRoom({
             </p>
           </div>
         )}
-        <div className="grid lg:grid-cols-3 gap-6">
+        <div className="grid lg:grid-cols-5 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {gameState ? (
-              <GameBoard
-                key={`board-${roomId || localRoomId}`}
-                gameType={gameType}
-                gameState={gameState}
-                playerTeam={getPlayerTeam()}
-                isMyTurn={getIsMyTurn()}
-                players={players}
-                currentUserId={userId}
-              />
+              <div className="h-[700px]">
+                <GameBoard
+                  key={`board-${roomId || localRoomId}`}
+                  gameType={gameType}
+                  gameState={gameState}
+                  playerTeam={getPlayerTeam()}
+                  isMyTurn={getIsMyTurn()}
+                  players={players}
+                  currentUserId={userId}
+                />
+              </div>
             ) : isWaiting ? (
-              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center min-h-[500px]">
+              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[700px]">
                 <div className="text-center">
                   <div className="w-64 h-64 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 flex items-center justify-center mb-4 mx-auto">
                     <span className="text-6xl">
@@ -576,7 +597,7 @@ export default function GameRoom({
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center min-h-[500px]">
+              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[700px]">
                 <div className="text-center">
                   <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
                   <p className="text-gray-600">Loading game...</p>
@@ -585,6 +606,15 @@ export default function GameRoom({
                   )}
                 </div>
               </div>
+            )}
+
+            {/* Betting Panel moved below game board */}
+            {players.length > 0 && (
+              <BettingPanel
+                roomId={roomId || localRoomId}
+                userId={userId}
+                players={players}
+              />
             )}
 
             <div className="flex gap-4">
@@ -605,25 +635,7 @@ export default function GameRoom({
             </div>
           </div>
 
-          <div className="space-y-6">
-            {players.length > 0 && (
-              <>
-                <BettingPanel
-                  roomId={roomId || localRoomId}
-                  userId={userId}
-                  players={players}
-                />
-                <GameInfoPanel
-                  gameType={gameType}
-                  players={players}
-                  gameState={gameState}
-                  playerTeam={getPlayerTeam()}
-                  isMyTurn={getIsMyTurn()}
-                  gameOver={gameOver}
-                  currentUserId={userId}
-                />
-              </>
-            )}
+          <div className="lg:col-span-3 space-y-6 flex flex-col">
             {players.length === 0 && (
               <div className="bg-white rounded-2xl shadow-lg p-6">
                 <div className="text-center text-gray-500">
@@ -631,14 +643,31 @@ export default function GameRoom({
                 </div>
               </div>
             )}
-            <ChatPanel onSendMessage={handleSendMessage} messages={messages} />
-            <VideoPanel 
-              onStartVideo={onStartVideo} 
-              onEndCall={onEndCall} 
-              players={players} 
-              currentUserId={userId}
-              roomId={roomId || localRoomId}
-            />
+            <div className="flex flex-col gap-6 h-[700px]">
+              <div className="flex-1 min-h-0">
+                <ChatPanel onSendMessage={handleSendMessage} messages={messages} />
+              </div>
+              <div className="flex-1 min-h-0">
+                <VideoPanel 
+                  onStartVideo={onStartVideo} 
+                  onEndCall={onEndCall} 
+                  players={players} 
+                  currentUserId={userId}
+                  roomId={roomId || localRoomId}
+                />
+              </div>
+            </div>
+            {players.length > 0 && (
+              <GameInfoPanel
+                gameType={gameType}
+                players={players}
+                gameState={gameState}
+                playerTeam={getPlayerTeam()}
+                isMyTurn={getIsMyTurn()}
+                gameOver={gameOver}
+                currentUserId={userId}
+              />
+            )}
           </div>
         </div>
       </main>
