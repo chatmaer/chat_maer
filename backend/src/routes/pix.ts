@@ -10,14 +10,37 @@ import { createRequire } from "module";
 // Use createRequire to import CommonJS module in ESM context
 const require = createRequire(import.meta.url);
 let mercadopago: any;
+let mercadopagoClient: any = null; // For v2.x SDK
 try {
-  mercadopago = require("mercadopago");
-  // Handle both default export and direct export
-  if (mercadopago.default) {
-    mercadopago = mercadopago.default;
+  const mercadopagoModule = require("mercadopago");
+  
+  // MercadoPago v2.x uses a class-based approach
+  // v1.x uses a singleton with configurations.setAccessToken()
+  if (mercadopagoModule.default) {
+    mercadopago = mercadopagoModule.default;
+  } else if (mercadopagoModule.MercadoPago) {
+    // v2.x: MercadoPago is a class
+    mercadopago = mercadopagoModule.MercadoPago;
+  } else if (mercadopagoModule.mercadopago) {
+    mercadopago = mercadopagoModule.mercadopago;
+  } else if (typeof mercadopagoModule === "function") {
+    mercadopago = mercadopagoModule;
+  } else {
+    mercadopago = mercadopagoModule;
   }
-} catch (error) {
-  logger.error({ error }, "Failed to import mercadopago package. Make sure it's installed: npm install mercadopago");
+  
+  // Log the structure for debugging
+  logger.info({ 
+    hasDefault: !!mercadopagoModule.default,
+    hasMercadoPago: !!mercadopagoModule.MercadoPago,
+    hasConfigurations: !!(mercadopago && mercadopago.configurations),
+    hasConfigure: !!(mercadopago && mercadopago.configure),
+    isFunction: typeof mercadopago === "function",
+    keys: Object.keys(mercadopagoModule),
+  }, "MercadoPago package structure");
+  
+} catch (error: any) {
+  logger.error({ error: error.message, stack: error.stack }, "Failed to import mercadopago package. Make sure it's installed: npm install mercadopago");
   mercadopago = null;
 }
 
@@ -28,10 +51,39 @@ router.use(authenticateToken);
 
 // Initialize Mercado Pago SDK
 if (config.mercadoPago.accessToken) {
-  if (mercadopago && mercadopago.configurations) {
+  if (!mercadopago) {
+    logger.error("Mercado Pago SDK is not available. Package may not be installed. Run: npm install mercadopago");
+  } else if (typeof mercadopago === "function" || mercadopago.MercadoPago) {
+    // v2.x: MercadoPago is a class, need to instantiate it
+    try {
+      const MercadoPagoClass = mercadopago.MercadoPago || mercadopago;
+      mercadopagoClient = new MercadoPagoClass({
+        accessToken: config.mercadoPago.accessToken,
+      });
+      logger.info("Mercado Pago SDK v2.x initialized successfully");
+    } catch (error: any) {
+      logger.error({ error: error.message }, "Failed to instantiate MercadoPago client (v2.x)");
+    }
+  } else if (mercadopago.configurations && mercadopago.configurations.setAccessToken) {
+    // v1.x: Use configurations.setAccessToken
     mercadopago.configurations.setAccessToken(config.mercadoPago.accessToken);
+    mercadopagoClient = mercadopago; // Use the same object for v1.x
+    logger.info("Mercado Pago SDK v1.x initialized successfully");
+  } else if (mercadopago.configure) {
+    // Alternative v2.x: Use configure method
+    mercadopago.configure({
+      access_token: config.mercadoPago.accessToken,
+    });
+    mercadopagoClient = mercadopago;
+    logger.info("Mercado Pago SDK initialized successfully (configure method)");
   } else {
-    logger.error("Mercado Pago SDK failed to initialize. Check if mercadopago package is installed correctly.");
+    logger.error({
+      hasConfigurations: !!mercadopago.configurations,
+      hasConfigure: !!mercadopago.configure,
+      hasMercadoPago: !!mercadopago.MercadoPago,
+      mercadopagoType: typeof mercadopago,
+      mercadopagoKeys: Object.keys(mercadopago || {}),
+    }, "Mercado Pago SDK failed to initialize. Package structure is unexpected. Check package version and installation.");
   }
 } else {
   logger.warn("Mercado Pago access token not configured. Pix integration will not work.");
@@ -47,7 +99,7 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
       });
     }
 
-    if (!mercadopago || !mercadopago.payment) {
+    if (!mercadopagoClient) {
       logger.error("Mercado Pago SDK is not available. Please install: npm install mercadopago");
       return res.status(503).json({
         error: "Pix integration is not available. Mercado Pago SDK not installed.",
@@ -114,9 +166,30 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
       external_reference: transactionId, // Link to our transaction ID
     };
 
-    // Create payment with Mercado Pago
-    const paymentResponse = await mercadopago.payment.create(paymentData);
-    const payment = paymentResponse.response;
+    // Create payment with Mercado Pago (supports both v1.x and v2.x)
+    let paymentResponse: any;
+    let payment: any;
+    
+    if (mercadopagoClient.payment && mercadopagoClient.payment.create) {
+      // v1.x API
+      paymentResponse = await mercadopagoClient.payment.create(paymentData);
+      payment = paymentResponse.response;
+    } else if (mercadopagoClient.payments && mercadopagoClient.payments.create) {
+      // v2.x API (alternative structure)
+      paymentResponse = await mercadopagoClient.payments.create({ body: paymentData });
+      payment = paymentResponse;
+    } else if (mercadopagoClient.payment && typeof mercadopagoClient.payment === "object") {
+      // v2.x API (direct payment object)
+      paymentResponse = await mercadopagoClient.payment.create({ body: paymentData });
+      payment = paymentResponse;
+    } else {
+      logger.error({ 
+        hasPayment: !!mercadopagoClient.payment,
+        hasPayments: !!mercadopagoClient.payments,
+        clientKeys: Object.keys(mercadopagoClient || {})
+      }, "MercadoPago client structure is unexpected");
+      return res.status(500).json({ error: "Failed to create payment: SDK structure mismatch" });
+    }
 
     // Extract QR code information
     const qrCode = payment.point_of_interaction?.transaction_data?.qr_code || null;
@@ -231,12 +304,28 @@ router.get("/deposit/status/:transactionId", async (req: AuthRequest, res) => {
 
     // If we have a Mercado Pago payment ID, check the payment status
     if (mercadoPagoPaymentId) {
-      if (!mercadopago || !mercadopago.payment) {
+      if (!mercadopagoClient) {
         logger.warn("Mercado Pago SDK is not available. Returning database status only.");
       } else {
         try {
-          const paymentResponse = await mercadopago.payment.findById(Number(mercadoPagoPaymentId));
-          const payment = paymentResponse.response;
+          let paymentResponse: any;
+          let payment: any;
+          
+          if (mercadopagoClient.payment && mercadopagoClient.payment.findById) {
+            // v1.x API
+            paymentResponse = await mercadopagoClient.payment.findById(Number(mercadoPagoPaymentId));
+            payment = paymentResponse.response;
+          } else if (mercadopagoClient.payments && mercadopagoClient.payments.get) {
+            // v2.x API (alternative structure)
+            paymentResponse = await mercadopagoClient.payments.get({ id: Number(mercadoPagoPaymentId) });
+            payment = paymentResponse;
+          } else if (mercadopagoClient.payment && typeof mercadopagoClient.payment === "object") {
+            // v2.x API (direct payment object)
+            paymentResponse = await mercadopagoClient.payment.get({ id: Number(mercadoPagoPaymentId) });
+            payment = paymentResponse;
+          } else {
+            throw new Error("Payment findById method not found in SDK");
+          }
 
         // Map Mercado Pago status to our status
         let newStatus = tx.status;
