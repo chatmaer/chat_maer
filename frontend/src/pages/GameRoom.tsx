@@ -47,7 +47,7 @@ export default function GameRoom({
 }: GameRoomProps) {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages] = useState<Message[]>(() => [
     {
       id: '1',
       sender: 'System',
@@ -56,6 +56,25 @@ export default function GameRoom({
       isOwn: false,
     },
   ]);
+
+  // Update initial message with translation when component mounts (only if still using default)
+  useEffect(() => {
+    setMessages((prev) => {
+      // Only update if we still have the default welcome message
+      if (prev.length === 1 && prev[0].id === '1' && prev[0].sender === 'System' && prev[0].text === 'Welcome to the game room! Good luck!') {
+        return [
+          {
+            id: '1',
+            sender: t('gameRoom.system'),
+            text: t('gameRoom.welcomeMessage'),
+            timestamp: new Date(),
+            isOwn: false,
+          },
+        ];
+      }
+      return prev;
+    });
+  }, [t]);
   const [gameState, setGameState] = useState<any>(null);
   const [players, setPlayers] = useState<any[]>([]);
   const [isWaiting, setIsWaiting] = useState(true);
@@ -549,20 +568,20 @@ export default function GameRoom({
         {isWaiting && players.length > 0 && players.length < 2 && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6 text-center">
             <p className="text-yellow-800 font-semibold">
-              Waiting for another player to join...
+              {t('game.waitingForAnotherPlayer')}
             </p>
             <p className="text-yellow-600 text-sm mt-1">
-              {players.length}/2 players in room - Moves will be enabled when both players join
+              {t('game.playersInRoom', { count: players.length })}
             </p>
           </div>
         )}
         {showLoading && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-center">
             <p className="text-blue-800 font-semibold">
-              Connecting to game room...
+              {t('game.connectingToRoom')}
             </p>
             <p className="text-blue-600 text-sm mt-1">
-              Please wait while we load the game
+              {t('game.pleaseWait')}
             </p>
           </div>
         )}
@@ -589,20 +608,20 @@ export default function GameRoom({
                     </span>
                   </div>
                   <p className="text-gray-600 font-medium">
-                    {gameType === 'tic-tac-toe' && 'Tic-Tac-Toe Board'}
-                    {gameType === 'checkers' && 'Checkers Board'}
-                    {gameType === 'chess' && 'Chess Board'}
+                    {gameType === 'tic-tac-toe' && t('game.board.ticTacToeBoard')}
+                    {gameType === 'checkers' && t('game.board.checkersBoard')}
+                    {gameType === 'chess' && t('game.board.chessBoard')}
                   </p>
-                  <p className="text-sm text-gray-500 mt-2">Waiting for game to start...</p>
+                  <p className="text-sm text-gray-500 mt-2">{t('game.board.waitingForGameStart')}</p>
                 </div>
               </div>
             ) : (
               <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[min(700px,calc(100vh-200px))] min-h-[400px] max-h-[700px]">
                 <div className="text-center">
                   <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
-                  <p className="text-gray-600">Loading game...</p>
+                  <p className="text-gray-600">{t('game.loadingGame')}</p>
                   {!isConnected && (
-                    <p className="text-sm text-red-600 mt-2">Not connected to server. Please check your connection.</p>
+                    <p className="text-sm text-red-600 mt-2">{t('game.notConnectedToServer')}</p>
                   )}
                 </div>
               </div>
@@ -623,14 +642,14 @@ export default function GameRoom({
                 className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg hover:shadow-xl"
               >
                 <RotateCcw className="w-5 h-5" />
-                Rematch
+                {t('game.rematch')}
               </button>
               <button
                 onClick={onExitRoom}
                 className="flex-1 bg-gray-200 text-gray-900 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors flex items-center justify-center gap-2"
               >
                 <LogOut className="w-5 h-5" />
-                Exit Room
+                {t('game.exitRoom')}
               </button>
             </div>
           </div>
@@ -639,7 +658,7 @@ export default function GameRoom({
             {players.length === 0 && (
               <div className="bg-white rounded-2xl shadow-lg p-6">
                 <div className="text-center text-gray-500">
-                  <p>Waiting for players...</p>
+                  <p>{t('game.waitingForPlayers')}</p>
                 </div>
               </div>
             )}

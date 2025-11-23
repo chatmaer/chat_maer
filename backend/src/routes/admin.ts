@@ -12,8 +12,13 @@ router.use(requireAdmin);
 // Get all users with pagination
 router.post("/users", async (req: AuthRequest, res) => {
   try {
+    logger.info({ userId: req.userId, userType: req.userType, body: req.body }, "Admin users request received");
+    
     const { page = 1, limit = 50, search = "" } = req.body;
-    const offset = (page - 1) * limit;
+    // Ensure page and limit are numbers
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 50;
+    const offset = (pageNum - 1) * limitNum;
 
     let sql = `
       SELECT id, username, balance, coins, user_type, is_banned, banned_at, ban_reason, 
@@ -22,13 +27,19 @@ router.post("/users", async (req: AuthRequest, res) => {
     `;
     const params: Array<string | number> = [];
 
-    if (search) {
+    if (search && typeof search === 'string' && search.trim()) {
       sql += ` WHERE username LIKE ? OR id LIKE ?`;
-      params.push(`%${search}%`, `%${search}%`);
+      params.push(`%${search.trim()}%`, `%${search.trim()}%`);
     }
 
-    sql += ` ORDER BY created_at DESC LIMIT ? OFFSET ?`;
-    params.push(limit, offset);
+    // Use template literals for LIMIT and OFFSET instead of parameters
+    // Some MySQL versions/drivers don't support parameterized LIMIT/OFFSET properly
+    // Ensure values are integers to prevent SQL injection
+    const safeLimit = Math.max(1, Math.min(limitNum, 1000)); // Cap at 1000 for safety
+    const safeOffset = Math.max(0, offset);
+    sql += ` ORDER BY created_at DESC LIMIT ${safeLimit} OFFSET ${safeOffset}`;
+
+    logger.info({ sql, params: params.map(p => typeof p === 'string' ? p.substring(0, 50) : p) }, "Executing users query");
 
     const users = (await query(sql, params)) as Array<{
       id: string;
@@ -44,18 +55,24 @@ router.post("/users", async (req: AuthRequest, res) => {
       pix_key: string | null;
     }>;
 
+    logger.info({ userCount: users.length }, "Users query successful");
+
     // Get total count
     let countSql = "SELECT COUNT(*) as total FROM users";
     const countParams: Array<string> = [];
-    if (search) {
+    if (search && typeof search === 'string' && search.trim()) {
       countSql += " WHERE username LIKE ? OR id LIKE ?";
-      countParams.push(`%${search}%`, `%${search}%`);
+      countParams.push(`%${search.trim()}%`, `%${search.trim()}%`);
     }
+    
+    logger.info({ countSql, countParams }, "Executing count query");
 
     const countResult = (await query(countSql, countParams)) as Array<{
       total: number;
     }>;
     const total = countResult[0]?.total || 0;
+    
+    logger.info({ total }, "Count query successful");
 
     res.json({
       users: users.map((u) => ({
@@ -74,15 +91,32 @@ router.post("/users", async (req: AuthRequest, res) => {
         pixKey: u.pix_key ? u.pix_key.replace(/(.{4})(.*)(.{4})/, "$1****$3") : null,
       })),
       pagination: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
-    logger.error(error, "Error fetching users");
-    res.status(500).json({ error: "Failed to fetch users" });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    
+    logger.error({ 
+      error: errorMessage, 
+      stack: errorStack,
+      userId: req.userId,
+      userType: req.userType 
+    }, "Error fetching users - full details");
+    
+    // Always return error details in development, and in production for admin debugging
+    res.status(500).json({ 
+      error: "Failed to fetch users",
+      message: errorMessage,
+      ...(process.env.NODE_ENV === "development" || req.userType === "admin" ? { 
+        details: errorMessage,
+        stack: errorStack 
+      } : {})
+    });
   }
 });
 
@@ -164,7 +198,14 @@ router.post("/users/balance", async (req: AuthRequest, res) => {
 router.post("/reports", async (req: AuthRequest, res) => {
   try {
     const { page = 1, limit = 50 } = req.body;
-    const offset = (page - 1) * limit;
+    // Ensure page and limit are numbers
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 50;
+    const offset = (pageNum - 1) * limitNum;
+    
+    // Use template literals for LIMIT and OFFSET instead of parameters
+    const safeLimit = Math.max(1, Math.min(limitNum, 1000));
+    const safeOffset = Math.max(0, offset);
 
     const reports = (await query(
       `SELECT r.id, r.reported_user_id, r.reporter_user_id, r.room_id, r.reason, r.created_at,
@@ -174,8 +215,8 @@ router.post("/reports", async (req: AuthRequest, res) => {
        JOIN users u1 ON r.reported_user_id = u1.id
        JOIN users u2 ON r.reporter_user_id = u2.id
        ORDER BY r.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [limit, offset],
+       LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+      [],
     )) as Array<{
       id: string;
       reported_user_id: string;
@@ -204,10 +245,10 @@ router.post("/reports", async (req: AuthRequest, res) => {
         createdAt: r.created_at,
       })),
       pagination: {
-        page,
-        limit,
+        page: pageNum,
+        limit: limitNum,
         total,
-        totalPages: Math.ceil(total / limit),
+        totalPages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {

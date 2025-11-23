@@ -9,8 +9,50 @@
  * - Production: VITE_API_URL=https://api.yourdomain.com
  */
 
-// Get API URL from environment variable, fallback to localhost for development
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+/**
+ * Get the API base URL with runtime detection for hosted environments
+ */
+function getApiBaseUrl(): string {
+  // Priority 1: Check localStorage for manual override (useful for debugging)
+  if (typeof window !== 'undefined') {
+    const storedApiUrl = localStorage.getItem('API_BASE_URL');
+    if (storedApiUrl && storedApiUrl.trim() !== '' && storedApiUrl !== 'undefined') {
+      console.log('Using API_BASE_URL from localStorage:', storedApiUrl);
+      return storedApiUrl.trim();
+    }
+  }
+
+  // Priority 2: Check if VITE_API_URL is set and not empty
+  const envApiUrl = import.meta.env.VITE_API_URL;
+  if (envApiUrl && typeof envApiUrl === 'string' && envApiUrl.trim() !== '' && envApiUrl !== 'undefined') {
+    return envApiUrl.trim();
+  }
+
+  // Priority 3: Runtime detection for hosted environments
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    const port = window.location.port;
+
+    // If not localhost, try to detect backend URL
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      // For hosted projects, assume backend is on same origin
+      // This works for most hosting scenarios (Vercel, Netlify, etc.)
+      const sameOrigin = `${protocol}//${hostname}${port ? `:${port}` : ''}`;
+      console.warn('No VITE_API_URL set. Using same-origin detection:', sameOrigin);
+      console.warn('To set manually, run: localStorage.setItem("API_BASE_URL", "https://your-backend-url.com")');
+      return sameOrigin;
+    }
+  }
+
+  // Fallback to localhost for development
+  console.warn('Using default API_BASE_URL: http://localhost:3001');
+  console.warn('To set manually, run: localStorage.setItem("API_BASE_URL", "http://your-backend-url:port")');
+  return 'http://localhost:3001';
+}
+
+// Get API URL from environment variable, fallback to runtime detection or localhost
+export const API_BASE_URL = getApiBaseUrl();
 
 console.log('API_BASE_URL', API_BASE_URL, import.meta.env.VITE_GOOGLE_CLIENT_ID);
 // Helper function to build API endpoint URLs

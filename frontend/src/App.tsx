@@ -116,6 +116,14 @@ function AppContent() {
   }, []);
 
   const handleNavigate = (page: string, data?: NavigationData) => {
+    // Prevent admins from navigating to game rooms or lobby
+    const userType = localStorage.getItem('userType');
+    if (userType === 'admin' && (page === 'game-room' || page === 'lobby')) {
+      showNotification('Admins cannot access game rooms. Please use the admin panel.', 'warning');
+      setCurrentPage('admin');
+      return;
+    }
+    
     setCurrentPage(page as Page);
     if (data?.gameType) {
       setCurrentGameType(data.gameType);
@@ -206,24 +214,42 @@ function AppContent() {
           userId={userId}
         />
       )}
-      {currentPage === 'game-room' && userId && (
-        <GameRoom
-          gameType={currentGameType}
-          roomId={currentRoomId}
-          userId={userId}
-          onNavigate={handleNavigate}
-          isConnected={isConnected}
-          onSendMessage={handleSendMessage}
-          onStartVideo={handleStartVideo}
-          onEndCall={handleEndCall}
-          onRematch={handleRematch}
-          onExitRoom={handleExitRoom}
-          onLogout={handleLogout}
-        />
-      )}
-      {currentPage === 'lobby' && userId && (
-        <Lobby onNavigate={handleNavigate} isConnected={isConnected} userId={userId} />
-      )}
+      {currentPage === 'game-room' && userId && (() => {
+        // Prevent admins from accessing game rooms
+        const userType = localStorage.getItem('userType');
+        if (userType === 'admin') {
+          // Redirect to admin panel
+          window.location.href = '/admin';
+          return null;
+        }
+        return (
+          <GameRoom
+            gameType={currentGameType}
+            roomId={currentRoomId}
+            userId={userId}
+            onNavigate={handleNavigate}
+            isConnected={isConnected}
+            onSendMessage={handleSendMessage}
+            onStartVideo={handleStartVideo}
+            onEndCall={handleEndCall}
+            onRematch={handleRematch}
+            onExitRoom={handleExitRoom}
+            onLogout={handleLogout}
+          />
+        );
+      })()}
+      {currentPage === 'lobby' && userId && (() => {
+        // Prevent admins from accessing lobby
+        const userType = localStorage.getItem('userType');
+        if (userType === 'admin') {
+          // Redirect to admin panel
+          window.location.href = '/admin';
+          return null;
+        }
+        return (
+          <Lobby onNavigate={handleNavigate} isConnected={isConnected} userId={userId} />
+        );
+      })()}
       {currentPage === 'admin' && (
         <AdminPanel />
       )}

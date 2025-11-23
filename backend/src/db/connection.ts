@@ -1,4 +1,5 @@
 import mysql from "mysql2/promise";
+import logger from "../lib/logger.js";
 
 interface DBConfig {
   host: string;
@@ -22,7 +23,7 @@ const config: DBConfig = {
   host: fixHostAddress(process.env.DB_HOST || "localhost"),
   user: process.env.DB_USER || "root",
   password: process.env.DB_PASSWORD || "",
-  database: process.env.DB_NAME || "real_skills",
+  database: process.env.DB_NAME || "chat_maer",
   port: process.env.DB_PORT ? parseInt(process.env.DB_PORT, 10) : 3306,
   connectTimeout: process.env.DB_CONNECT_TIMEOUT
     ? parseInt(process.env.DB_CONNECT_TIMEOUT, 10)
@@ -104,9 +105,26 @@ export const query = async (
   sql: string,
   params?: unknown[],
 ): Promise<unknown[]> => {
-  const connection = await getPool();
-  const [results] = await connection.execute(sql, params || []);
-  return results as unknown[];
+  try {
+    const connection = await getPool();
+    const [results] = await connection.execute(sql, params || []);
+    return results as unknown[];
+  } catch (error) {
+    // Log the SQL and params for debugging (truncate long params)
+    const logParams = params?.map(p => {
+      if (typeof p === 'string' && p.length > 100) {
+        return p.substring(0, 100) + '...';
+      }
+      return p;
+    });
+    logger.error({ 
+      sql, 
+      params: logParams, 
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    }, "Database query error");
+    throw error;
+  }
 };
 
 export const testConnection = async (): Promise<boolean> => {

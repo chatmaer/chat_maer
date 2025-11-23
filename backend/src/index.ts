@@ -20,17 +20,8 @@ import pixRoutes from "./routes/pix.js";
 import adminRoutes from "./routes/admin.js";
 import "./controllers/passport.js";
 
-import { fileURLToPath } from "url";
-import path from "node:path";
-
-// create __filename and __dirname in ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 const app = express();
 const httpServer = createServer(app);
-
-app.set("trust proxy", 1);
 
 const allowedOrigins = [
   config.clientUrl,
@@ -38,41 +29,28 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
-  "https://chat-maer.vercel.app",
-  "https://chatmaer.ddns.net", // add your HTTPS domain here
-  // Add custom domains from environment variable
   ...config.allowedOrigins,
 ];
 
-// Helper function to check if origin is allowed
 const isOriginAllowed = (origin: string | undefined): boolean => {
-  // Allow requests with no origin (like mobile apps or curl requests)
   if (!origin) return true;
-
-  // Normalize origin (remove trailing slash and convert to lowercase for comparison)
-  const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
-
-  // Check if origin is in the allowed list (exact match)
-  const normalizedAllowedOrigins = allowedOrigins.map((o) =>
-    o.replace(/\/$/, "").toLowerCase()
-  );
+  
+  const normalizedOrigin = origin.replace(/\/$/, '').toLowerCase();
+  const normalizedAllowedOrigins = allowedOrigins.map((o) => o.replace(/\/$/, '').toLowerCase());
   if (normalizedAllowedOrigins.includes(normalizedOrigin)) return true;
-
-  // Allow all Vercel domains (*.vercel.app) - for preview and production deployments
-  if (normalizedOrigin.endsWith(".vercel.app")) return true;
-
-  // Allow custom domains from CLIENT_URL (exact match)
+  
+  if (normalizedOrigin.endsWith('.vercel.app')) return true;
+  
   if (config.clientUrl) {
-    const clientUrlNormalized = config.clientUrl.replace(/\/$/, "").toLowerCase();
+    const clientUrlNormalized = config.clientUrl.replace(/\/$/, '').toLowerCase();
     if (normalizedOrigin === clientUrlNormalized) return true;
   }
-
-  // Check against custom domains from ALLOWED_ORIGINS environment variable (exact match)
+  
   for (const allowedOrigin of config.allowedOrigins) {
-    const allowedNormalized = allowedOrigin.replace(/\/$/, "").toLowerCase();
+    const allowedNormalized = allowedOrigin.replace(/\/$/, '').toLowerCase();
     if (normalizedOrigin === allowedNormalized) return true;
   }
-
+  
   return false;
 };
 
@@ -106,20 +84,6 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 
-// Set security header to allow OAuth popups to close and be usable
-// This allows popup flows while preserving COOP isolation for most scenarios.
-app.use((req, res, next) => {
-  res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-  next();
-});
-
-// Serve frontend static files (ensure frontend built files are at ../frontend)
-const frontendPath = path.join(__dirname, "../frontend");
-app.use(express.static(frontendPath));
-app.get(/(.*)/, (req, res) => {
-  res.sendFile(path.join(frontendPath, "index.html"));
-});
-
 // Middleware
 app.use(cors(corsOptions));
 app.use(express.json());
@@ -131,12 +95,11 @@ app.use(
     resave: true,
     saveUninitialized: true,
     cookie: {
-      // secure should be true in production; because we trust proxy, this works correctly when nginx terminates TLS
       secure: config.nodeEnv === "production",
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
     },
-  })
+  }),
 );
 
 // Initialize Passport
@@ -172,7 +135,7 @@ app.get("/admin/rooms", async (req, res) => {
       GROUP BY r.id
       ORDER BY r.created_at DESC
       LIMIT 50
-    `
+    `,
     );
     res.json(rooms);
   } catch (error) {
@@ -191,7 +154,7 @@ app.get("/admin/users", async (req, res) => {
       FROM users
       ORDER BY created_at DESC
       LIMIT 100
-    `
+    `,
     );
     res.json(users);
   } catch (error) {

@@ -60,14 +60,27 @@ export const authenticateToken = async (
     }
 
     // Attach user info to request
+    // Use user_type from database (source of truth) instead of JWT payload
+    // This ensures admin status is always current
     req.userId = payload.userId;
-    req.username = payload.username;
-    req.userType = payload.userType;
+    req.username = user[0].username;
+    req.userType = user[0].user_type;
 
     next();
   } catch (error) {
-    logger.error(error, "Error in authenticateToken middleware");
-    res.status(500).json({ error: "Authentication failed" });
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    logger.error({ 
+      error: errorMessage, 
+      stack: errorStack,
+      path: req.path,
+      method: req.method
+    }, "Error in authenticateToken middleware");
+    res.status(500).json({ 
+      error: "Authentication failed",
+      message: errorMessage,
+      ...(process.env.NODE_ENV === "development" ? { stack: errorStack } : {})
+    });
   }
 };
 
@@ -79,10 +92,28 @@ export const requireAdmin = (
   res: Response,
   next: NextFunction,
 ): void => {
+  // Log for debugging
+  logger.info({ 
+    userId: req.userId, 
+    username: req.username, 
+    userType: req.userType 
+  }, "requireAdmin check");
+  
+  if (!req.userType) {
+    logger.error({ userId: req.userId }, "User type not set in request");
+    res.status(403).json({ error: "Admin access required - user type not set" });
+    return;
+  }
+  
   if (req.userType !== "admin") {
+    logger.warn({ 
+      userId: req.userId, 
+      userType: req.userType 
+    }, "Admin access denied - user is not admin");
     res.status(403).json({ error: "Admin access required" });
     return;
   }
+  
   next();
 };
 

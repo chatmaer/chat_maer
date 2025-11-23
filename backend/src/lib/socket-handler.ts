@@ -58,6 +58,25 @@ const lastInsufficientBalanceError = new Map<string, number>(); // roomId -> tim
 const INSUFFICIENT_BALANCE_ERROR_COOLDOWN = 5000; // 5 seconds
 
 /**
+ * Check if a user is an admin
+ * @param userId User ID to check
+ * @returns true if user is admin, false otherwise
+ */
+const isUserAdmin = async (userId: string): Promise<boolean> => {
+  try {
+    const userCheck = (await query(
+      "SELECT user_type FROM users WHERE id = ?",
+      [userId],
+    )) as Array<{ user_type: string }>;
+    
+    return userCheck.length > 0 && userCheck[0].user_type === "admin";
+  } catch (error) {
+    logger.error(error, "Error checking if user is admin");
+    return false;
+  }
+};
+
+/**
  * Check if all players in a room have sufficient balance to cover the betting amount
  * @param players Array of players in the room
  * @param bettingAmount The betting amount required
@@ -358,7 +377,7 @@ export const setupSocketHandlers = (io: Server): void => {
 
         // Check if user exists and is not banned
         const user = (await query(
-          "SELECT id, username, COALESCE(display_username, username) as display_username, is_banned, username_set FROM users WHERE id = ?",
+          "SELECT id, username, COALESCE(display_username, username) as display_username, is_banned, username_set, user_type FROM users WHERE id = ?",
           [userId],
         )) as Array<{
           id: string;
@@ -366,6 +385,7 @@ export const setupSocketHandlers = (io: Server): void => {
           display_username: string;
           is_banned: boolean;
           username_set: boolean;
+          user_type: string;
         }>;
 
         if (user.length === 0) {
@@ -387,6 +407,15 @@ export const setupSocketHandlers = (io: Server): void => {
           socket.emit("error", {
             message: "Please set your username first",
             needsUsername: true,
+          });
+          return;
+        }
+
+        // Prevent admins from connecting to game rooms
+        if (user[0].user_type === "admin") {
+          socket.emit("error", {
+            message: "Admins cannot join game rooms. Please use the admin panel.",
+            adminBlocked: true,
           });
           return;
         }
@@ -452,6 +481,17 @@ export const setupSocketHandlers = (io: Server): void => {
           return;
         }
 
+        // Check if user is admin - prevent admins from joining game rooms
+        // Cache this result to avoid multiple database queries
+        const isAdmin = await isUserAdmin(socketWithUserId.userId);
+        if (isAdmin) {
+          socket.emit("error", {
+            message: "Admins cannot join game rooms. Please use the admin panel.",
+            adminBlocked: true,
+          });
+          return;
+        }
+
         // Check and auto-ban if user has 5+ reports
         const isBanned = await checkAndAutoBanUser(socketWithUserId.userId);
         if (isBanned) {
@@ -478,6 +518,8 @@ export const setupSocketHandlers = (io: Server): void => {
             existingRoom.status === "waiting" &&
             existingRoom.player_count < 2
           ) {
+            // Admin already checked above, no need to check again
+            
             // User is still in a valid waiting room - rejoin socket room
             socket.join(existingRoom.id);
             userRooms.set(socketWithUserId.userId, existingRoom.id);
@@ -604,6 +646,8 @@ export const setupSocketHandlers = (io: Server): void => {
           }
         }
 
+        // Admin already checked above, no need to check again
+
         // Look for waiting room with available slot
         let room = await findWaitingRoom(gameType);
 
@@ -630,6 +674,8 @@ export const setupSocketHandlers = (io: Server): void => {
             }
           }
         }
+
+        // Admin already checked above, no need to check again
 
         // Join socket room FIRST before checking players
         socket.join(room.id);
@@ -768,6 +814,17 @@ export const setupSocketHandlers = (io: Server): void => {
             return;
           }
 
+          // Check if user is admin - prevent admins from joining game rooms
+          // Cache this result to avoid multiple database queries
+          const isAdmin = await isUserAdmin(socketWithUserId.userId);
+          if (isAdmin) {
+            socket.emit("error", {
+              message: "Admins cannot join game rooms. Please use the admin panel.",
+              adminBlocked: true,
+            });
+            return;
+          }
+
           // Check and auto-ban if user has 5+ reports
           const isBanned = await checkAndAutoBanUser(socketWithUserId.userId);
           if (isBanned) {
@@ -796,6 +853,8 @@ export const setupSocketHandlers = (io: Server): void => {
             room = keywordRooms[0];
           }
 
+          // Admin already checked above, no need to check again
+
           if (!room) {
             const roomId = await createRoom(gameType, keyword);
             await addPlayerToRoom(roomId, socketWithUserId.userId, true);
@@ -809,6 +868,8 @@ export const setupSocketHandlers = (io: Server): void => {
               await addPlayerToRoom(room.id, socketWithUserId.userId, false);
             }
           }
+
+          // Admin already checked above, no need to check again
 
           socket.join(room.id);
           userRooms.set(socketWithUserId.userId, room.id);
@@ -930,6 +991,16 @@ export const setupSocketHandlers = (io: Server): void => {
           return;
         }
 
+        // Prevent admins from requesting game state
+        const isAdmin = await isUserAdmin(socketWithUserId.userId);
+        if (isAdmin) {
+          socket.emit("error", {
+            message: "Admins cannot access game rooms. Please use the admin panel.",
+            adminBlocked: true,
+          });
+          return;
+        }
+
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
           socket.emit("error", { message: "Not in a room" });
@@ -980,6 +1051,16 @@ export const setupSocketHandlers = (io: Server): void => {
         const socketWithUserId = socket as Socket & { userId?: string };
         if (!socketWithUserId.userId) {
           socket.emit("error", { message: "User not connected" });
+          return;
+        }
+
+        // Prevent admins from making moves
+        const isAdmin = await isUserAdmin(socketWithUserId.userId);
+        if (isAdmin) {
+          socket.emit("error", {
+            message: "Admins cannot play games. Please use the admin panel.",
+            adminBlocked: true,
+          });
           return;
         }
 
@@ -1317,6 +1398,16 @@ export const setupSocketHandlers = (io: Server): void => {
           return;
         }
 
+        // Prevent admins from promoting pawns
+        const isAdmin = await isUserAdmin(socketWithUserId.userId);
+        if (isAdmin) {
+          socket.emit("error", {
+            message: "Admins cannot play games. Please use the admin panel.",
+            adminBlocked: true,
+          });
+          return;
+        }
+
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
           socket.emit("error", { message: "Not in a room" });
@@ -1492,6 +1583,16 @@ export const setupSocketHandlers = (io: Server): void => {
         const socketWithUserId = socket as Socket & { userId?: string };
         if (!socketWithUserId.userId) {
           socket.emit("error", { message: "User not connected" });
+          return;
+        }
+
+        // Prevent admins from sending chat messages in game rooms
+        const isAdmin = await isUserAdmin(socketWithUserId.userId);
+        if (isAdmin) {
+          socket.emit("error", {
+            message: "Admins cannot interact with game rooms. Please use the admin panel.",
+            adminBlocked: true,
+          });
           return;
         }
 
@@ -1859,6 +1960,16 @@ export const setupSocketHandlers = (io: Server): void => {
       try {
         const socketWithUserId = socket as Socket & { userId?: string };
         if (!socketWithUserId.userId) return;
+
+        // Prevent admins from requesting rematches
+        const isAdmin = await isUserAdmin(socketWithUserId.userId);
+        if (isAdmin) {
+          socket.emit("error", {
+            message: "Admins cannot interact with game rooms. Please use the admin panel.",
+            adminBlocked: true,
+          });
+          return;
+        }
 
         const roomId = data.roomId || userRooms.get(socketWithUserId.userId);
         if (!roomId) {

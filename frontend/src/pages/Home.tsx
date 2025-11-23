@@ -108,6 +108,13 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
   };
 
   const handleRandomMatch = (gameType: string) => {
+    // Check if user is admin - prevent admins from joining game rooms
+    const userType = localStorage.getItem('userType');
+    if (userType === 'admin') {
+      showNotification('Admins cannot join game rooms. Please use the admin panel.', 'warning');
+      return;
+    }
+
     if (!isUsernameSet) {
       showNotification(t('home.usernameRequired'), 'warning');
       return;

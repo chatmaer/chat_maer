@@ -4,6 +4,7 @@ import { useNotification } from '../contexts/NotificationContext';
 import { useDialog } from '../hooks/useDialog';
 import { useTranslation } from 'react-i18next';
 import { API_ENDPOINTS } from '../config/api';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 interface User {
   id: string;
@@ -100,15 +101,29 @@ export default function AdminPanel() {
         setTotalPages(data.pagination?.totalPages || 1);
       } else {
         const error = await response.json();
+        console.error('Admin users fetch error:', error);
         if (error.error === 'Admin access required') {
           showNotification(t('admin.adminAccessRequired'), 'error');
           window.location.href = '/';
         } else {
-          showNotification(error.error || t('admin.errorFetchingUsers'), 'error');
+          // Show detailed error message if available
+          const errorMsg = error.message || error.details || error.error || t('admin.errorFetchingUsers');
+          showNotification(errorMsg, 'error');
+          console.error('Full error details:', error);
         }
       }
     } catch (error) {
-      showNotification(t('admin.errorFetchingUsers'), 'error');
+      console.error('Admin users fetch exception:', error);
+      let errorMsg = error instanceof Error ? error.message : String(error);
+      
+      // Provide helpful error messages for common issues
+      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('ERR_CONNECTION_REFUSED')) {
+        const apiUrl = (await import('../config/api')).API_BASE_URL;
+        errorMsg = `Cannot connect to backend at ${apiUrl}. Please check:\n1. Backend server is running\n2. Backend URL is correct\n3. Set API URL: localStorage.setItem('API_BASE_URL', 'http://your-backend-url:port')`;
+        console.error('Connection error. Current API_BASE_URL:', apiUrl);
+      }
+      
+      showNotification(`${t('admin.errorFetchingUsers')}: ${errorMsg}`, 'error');
     } finally {
       setLoading(false);
     }
@@ -162,6 +177,16 @@ export default function AdminPanel() {
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+      let errorMsg = error instanceof Error ? error.message : String(error);
+      
+      // Provide helpful error messages for common issues
+      if (errorMsg.includes('Failed to fetch') || errorMsg.includes('ERR_CONNECTION_REFUSED')) {
+        const { API_BASE_URL } = await import('../config/api');
+        errorMsg = `Cannot connect to backend at ${API_BASE_URL}`;
+        console.error('Connection error. Current API_BASE_URL:', API_BASE_URL);
+      }
+      
+      showNotification(`${t('admin.errorFetchingStats')}: ${errorMsg}`, 'error');
     }
   };
 
@@ -293,6 +318,7 @@ export default function AdminPanel() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              <LanguageSwitcher />
               <span className="text-sm text-gray-600">
                 {localStorage.getItem('username') || 'Admin'}
               </span>
