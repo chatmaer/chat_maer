@@ -102,10 +102,10 @@ export default function CheckersBoard({ gameState, playerTeam, isMyTurn, players
   return (
     <div className="flex flex-col items-center justify-center p-4 h-full">
       <div className="mb-3 text-center">
-        <p className="text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
-        <p className="text-sm text-gray-600 mt-1">{t('game.youAre')} {playerTeam === 'player1' ? t('game.player1Bottom') : t('game.player2Top')}</p>
+        <p className="text-lg sm:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
+        <p className="text-xs sm:text-sm text-gray-600 mt-1">{t('game.youAre')} {playerTeam === 'player1' ? t('game.player1Bottom') : t('game.player2Top')}</p>
       </div>
-      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl">
+      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[512px] mx-auto">
         {Array.from({ length: 64 }).map((_, index) => {
           const x = index % 8;
           const y = Math.floor(index / 8);
@@ -120,9 +120,9 @@ export default function CheckersBoard({ gameState, playerTeam, isMyTurn, players
               onClick={() => handleSquareClick(x, y)}
               disabled={!isMyTurn || gameState.winner !== null}
               className={`
-                w-16 h-16 flex items-center justify-center
+                aspect-square w-full flex items-center justify-center
                 ${isLight ? 'bg-amber-100' : 'bg-amber-800'}
-                ${isSelected ? 'ring-4 ring-blue-500 ring-offset-2' : ''}
+                ${isSelected ? 'ring-2 sm:ring-4 ring-blue-500 ring-offset-1 sm:ring-offset-2' : ''}
                 ${isHighlighted ? 'bg-green-400' : ''}
                 ${piece ? 'cursor-pointer' : ''}
                 transition-all duration-150
@@ -132,7 +132,7 @@ export default function CheckersBoard({ gameState, playerTeam, isMyTurn, players
               {piece && (
                 <div
                   className={`
-                    w-12 h-12 rounded-full border-4
+                    w-[60%] h-[60%] sm:w-12 sm:h-12 rounded-full border-2 sm:border-4
                     ${piece === 'player1' 
                       ? 'bg-red-500 border-red-700' 
                       : 'bg-blue-500 border-blue-700'

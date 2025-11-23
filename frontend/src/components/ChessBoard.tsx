@@ -280,9 +280,9 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
         onClick={() => handleSquareClick(x, y)}
         disabled={!isMyTurn || gameState.winningTeam !== null || promotionPosition !== null}
         className={`
-          w-16 h-16 flex items-center justify-center text-3xl
+          aspect-square w-full flex items-center justify-center text-3xl
           ${isLight ? 'bg-amber-100' : 'bg-amber-800'}
-          ${isSelected ? 'ring-4 ring-blue-500 ring-offset-2' : ''}
+          ${isSelected ? 'ring-2 sm:ring-4 ring-blue-500 ring-offset-1 sm:ring-offset-2' : ''}
           ${isHighlighted ? 'bg-green-400' : ''}
           transition-all duration-150
           ${piece && piece.team === playerTeam && isMyTurn ? 'cursor-pointer hover:opacity-80' : ''}
@@ -292,7 +292,7 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
           <img 
             src={PIECE_IMAGES[piece.team]?.[piece.type]} 
             alt={`${piece.team} ${piece.type}`}
-            className="w-12 h-12 object-contain"
+            className="w-[60%] h-[60%] sm:w-12 sm:h-12 object-contain"
           />
         )}
       </button>
@@ -302,12 +302,12 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
   return (
     <div className="flex flex-col items-center justify-center p-4 h-full">
       <div className="mb-3 text-center">
-        <p className="text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
-        <p className="text-sm text-gray-600 mt-1">
+        <p className="text-lg sm:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
+        <p className="text-xs sm:text-sm text-gray-600 mt-1">
           {t('game.youAre')} {playerTeam === 'w' ? t('game.whiteBottom') : t('game.blackTop')} | {t('game.turn')} {gameState.totalTurns}
         </p>
       </div>
-      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl">
+      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[512px] mx-auto">
         {Array.from({ length: 64 }).map((_, index) => {
           const x = index % 8;
           const y = Math.floor(index / 8);

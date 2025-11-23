@@ -569,7 +569,7 @@ export default function GameRoom({
         <div className="grid lg:grid-cols-5 gap-6">
           <div className="lg:col-span-2 space-y-6">
             {gameState ? (
-              <div className="h-[700px]">
+              <div className="h-[min(700px,calc(100vh-200px))] min-h-[400px] max-h-[700px]">
                 <GameBoard
                   key={`board-${roomId || localRoomId}`}
                   gameType={gameType}
@@ -581,7 +581,7 @@ export default function GameRoom({
                 />
               </div>
             ) : isWaiting ? (
-              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[700px]">
+              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[min(700px,calc(100vh-200px))] min-h-[400px] max-h-[700px]">
                 <div className="text-center">
                   <div className="w-64 h-64 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 flex items-center justify-center mb-4 mx-auto">
                     <span className="text-6xl">
@@ -597,7 +597,7 @@ export default function GameRoom({
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[700px]">
+              <div className="bg-white rounded-2xl shadow-lg p-6 flex items-center justify-center h-[min(700px,calc(100vh-200px))] min-h-[400px] max-h-[700px]">
                 <div className="text-center">
                   <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4" />
                   <p className="text-gray-600">Loading game...</p>
@@ -643,7 +643,7 @@ export default function GameRoom({
                 </div>
               </div>
             )}
-            <div className="flex flex-col gap-6 h-[700px]">
+            <div className="flex flex-col gap-6 h-[min(700px,calc(100vh-200px))] min-h-[400px] max-h-[700px]">
               <div className="flex-1 min-h-0">
                 <ChatPanel onSendMessage={handleSendMessage} messages={messages} />
               </div>

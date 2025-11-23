@@ -5,7 +5,7 @@ import App from './App.tsx';
 import './index.css';
 import './i18n/config';
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '703749845488-57nqnvbgmgr9nritjfasnq2q6lhstanv.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
