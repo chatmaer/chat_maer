@@ -36,15 +36,11 @@ function getApiBaseUrl(): string {
 
     // If not localhost, try to detect backend URL
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      // For VPS hosting, backend is typically on the same host but different port (3001)
-      // Try to detect if backend might be on port 3001
-      const backendPort = '3001';
-      const detectedUrl = `${protocol}//${hostname}:${backendPort}`;
-      console.warn('No VITE_API_URL set. Detected production environment.');
-      console.warn('Attempting to use:', detectedUrl);
-      console.warn('If this is incorrect, set it manually:');
-      console.warn('  localStorage.setItem("API_BASE_URL", "http://your-vps-ip:3001")');
-      console.warn('  or set VITE_API_URL environment variable when building');
+      // For production, backend is on the same domain (nginx proxies to backend)
+      // Use the same protocol and hostname, no port needed
+      const detectedUrl = `${protocol}//${hostname}`;
+      console.log('No VITE_API_URL set. Detected production environment.');
+      console.log('Using same domain for API:', detectedUrl);
       return detectedUrl;
     }
   }

@@ -5,6 +5,8 @@ import { Server } from "socket.io";
 import cors from "cors";
 import passport from "passport";
 import session from "express-session";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import { config } from "./config/env.js";
 import { setupSocketHandlers } from "./lib/socket-handler.js";
@@ -29,6 +31,8 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:3000",
   "http://127.0.0.1:5173",
+  "https://chatmaer.ddns.net",
+  "http://chatmaer.ddns.net",
   ...config.allowedOrigins,
 ];
 
@@ -40,6 +44,9 @@ const isOriginAllowed = (origin: string | undefined): boolean => {
   if (normalizedAllowedOrigins.includes(normalizedOrigin)) return true;
   
   if (normalizedOrigin.endsWith('.vercel.app')) return true;
+  
+  // Allow same-origin requests (when frontend and backend are on same domain)
+  if (normalizedOrigin.includes('chatmaer.ddns.net')) return true;
   
   if (config.clientUrl) {
     const clientUrlNormalized = config.clientUrl.replace(/\/$/, '').toLowerCase();
@@ -106,6 +113,14 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
+// Serve frontend static files
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendPath = path.join(__dirname, "../frontend");
+
+// Serve static assets (CSS, JS, images, etc.) - must be before routes
+app.use(express.static(frontendPath));
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/pix", pixRoutes);
@@ -161,6 +176,20 @@ app.get("/admin/users", async (req, res) => {
     logger.error(error, "Error fetching users");
     res.status(500).json({ error: "Failed to fetch users" });
   }
+});
+
+// Catch-all route: serve index.html for SPA routing (must be last, after all API routes)
+app.get("*", (req, res) => {
+  // Don't serve index.html for API routes, socket.io, health, or metrics
+  if (
+    req.path.startsWith("/api") ||
+    req.path.startsWith("/socket.io") ||
+    req.path === "/health" ||
+    req.path === "/metrics"
+  ) {
+    return res.status(404).json({ error: "Not found" });
+  }
+  res.sendFile(path.join(frontendPath, "index.html"));
 });
 
 // Setup Socket.IO handlers
