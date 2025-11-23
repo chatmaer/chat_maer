@@ -10,7 +10,7 @@
  */
 
 // Get API URL from environment variable, fallback to localhost for development
-export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+export const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://chatmaer.ddns.net/';
 
 console.log('API_BASE_URL', API_BASE_URL, import.meta.env.VITE_GOOGLE_CLIENT_ID);
 // Helper function to build API endpoint URLs
