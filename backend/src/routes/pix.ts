@@ -201,7 +201,9 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
     }
 
     // Calculate expiration time (Mercado Pago Pix QR codes typically expire in 30 minutes)
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    // Format as MySQL DATETIME: 'YYYY-MM-DD HH:mm:ss' (no milliseconds, no timezone)
+    const expiresAtDate = new Date(Date.now() + 30 * 60 * 1000);
+    const expiresAt = expiresAtDate.toISOString().slice(0, 19).replace('T', ' ');
 
     // Store QR code data
     const qrCodeData = {

@@ -324,7 +324,7 @@ export default function VideoPanel({
         )}
       </div>
 
-      <div className="flex-1 grid grid-cols-2 gap-3 mb-4 min-h-0">
+      <div className="flex-1 grid grid-cols-2 gap-3 min-h-0 relative">
         {/* Local Video */}
         <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl flex items-center justify-center relative overflow-hidden">
           <video 
@@ -376,33 +376,34 @@ export default function VideoPanel({
             {opponentUsername}
           </div>
         </div>
-      </div>
 
-      <div className="flex gap-2 justify-center">
-        <button
-          onClick={toggleVideo}
-          disabled={isProcessing}
-          className={`p-3 rounded-full transition-colors ${
-            isVideoOn
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
-          title={isVideoOn ? 'Turn off video' : 'Turn on video'}
-        >
-          {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
-        </button>
+        {/* Control buttons positioned over the video area */}
+        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex gap-2 justify-center z-10">
+          <button
+            onClick={toggleVideo}
+            disabled={isProcessing}
+            className={`p-3 rounded-full transition-colors shadow-lg ${
+              isVideoOn
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
+            title={isVideoOn ? 'Turn off video' : 'Turn on video'}
+          >
+            {isVideoOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+          </button>
 
-        <button
-          onClick={toggleMute}
-          className={`p-3 rounded-full transition-colors ${
-            isMuted
-              ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              : 'bg-blue-600 text-white hover:bg-blue-700'
-          }`}
-          title={isMuted ? 'Unmute' : 'Mute'}
-        >
-          {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-        </button>
+          <button
+            onClick={toggleMute}
+            className={`p-3 rounded-full transition-colors shadow-lg ${
+              isMuted
+                ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
+            title={isMuted ? 'Unmute' : 'Mute'}
+          >
+            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
     </div>
   );
