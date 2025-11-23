@@ -20,6 +20,13 @@ import pixRoutes from "./routes/pix.js";
 import adminRoutes from "./routes/admin.js";
 import "./controllers/passport.js";
 
+import { fileURLToPath } from "url";
+import path from "node:path";
+
+// create __filename and __dirname in ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -94,6 +101,13 @@ const corsOptions = {
   credentials: true,
   optionsSuccessStatus: 200,
 };
+
+const frontenPath = path.join(__dirname, '../frontend');
+
+app.use(express.static(frontenPath));
+app.get(/(.*)/, (req, res) => {
+  res.sendFile(path.join(frontenPath, 'index.html'));
+})
 
 // Middleware
 app.use(cors(corsOptions));
