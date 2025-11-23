@@ -36,12 +36,16 @@ function getApiBaseUrl(): string {
 
     // If not localhost, try to detect backend URL
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      // For hosted projects, assume backend is on same origin
-      // This works for most hosting scenarios (Vercel, Netlify, etc.)
-      const sameOrigin = `${protocol}//${hostname}${port ? `:${port}` : ''}`;
-      console.warn('No VITE_API_URL set. Using same-origin detection:', sameOrigin);
-      console.warn('To set manually, run: localStorage.setItem("API_BASE_URL", "https://your-backend-url.com")');
-      return sameOrigin;
+      // For VPS hosting, backend is typically on the same host but different port (3001)
+      // Try to detect if backend might be on port 3001
+      const backendPort = '3001';
+      const detectedUrl = `${protocol}//${hostname}:${backendPort}`;
+      console.warn('No VITE_API_URL set. Detected production environment.');
+      console.warn('Attempting to use:', detectedUrl);
+      console.warn('If this is incorrect, set it manually:');
+      console.warn('  localStorage.setItem("API_BASE_URL", "http://your-vps-ip:3001")');
+      console.warn('  or set VITE_API_URL environment variable when building');
+      return detectedUrl;
     }
   }
 
@@ -92,9 +96,21 @@ export const API_ENDPOINTS = {
   },
 } as const;
 
-// Socket.IO connection URL (removes /api suffix if present)
+// Socket.IO connection URL (removes /api suffix if present and converts protocol)
 export const getSocketUrl = (): string => {
   // Remove /api suffix if present, Socket.io connects to root
-  return API_BASE_URL.replace(/\/api$/, '');
+  let url = API_BASE_URL.replace(/\/api$/, '');
+  
+  // Convert HTTP/HTTPS to WS/WSS for WebSocket connections
+  // Socket.IO can handle HTTP/HTTPS, but using WS/WSS is more explicit
+  if (url.startsWith('https://')) {
+    url = url.replace('https://', 'wss://');
+  } else if (url.startsWith('http://')) {
+    url = url.replace('http://', 'ws://');
+  }
+  
+  console.log('WebSocket URL:', url, '(derived from API_BASE_URL:', API_BASE_URL, ')');
+  
+  return url;
 };
 
