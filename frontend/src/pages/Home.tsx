@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import Header from '../components/Header';
 import { getSocket } from '../utils/socket';
 import { useNotification } from '../contexts/NotificationContext';
-import ticTacToeLogo from '../assets/tic-tac-toe.png';
-import checkersLogo from '../assets/checkers.png';
-import chessLogo from '../assets/chess.png';
+import ticTacToeLogo from '../assets/tic-tac-toe.webp';
+import checkersLogo from '../assets/checkers.webp';
+import chessLogo from '../assets/chess.webp';
 
 interface HomeProps {
   onNavigate: (page: string, data?: { gameType?: string; keyword?: string; roomId?: string }) => void;
