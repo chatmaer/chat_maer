@@ -80,6 +80,7 @@ export const API_ENDPOINTS = {
     DEPOSIT_STATUS: (transactionId: string) => getApiUrl(`api/pix/deposit/status/${transactionId}`),
     WITHDRAWAL_REQUEST: getApiUrl('api/pix/withdrawal/request'),
     WITHDRAWAL_STATUS: (transactionId: string) => getApiUrl(`api/pix/withdrawal/status/${transactionId}`),
+    BALANCE: getApiUrl('api/pix/balance'),
   },
   // Admin endpoints
   ADMIN: {

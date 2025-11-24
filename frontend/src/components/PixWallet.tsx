@@ -66,26 +66,38 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
   const fetchBalance = async () => {
     if (!userId) return;
     try {
-      // Get balance from betting info endpoint using socket
-      const socket = getSocket();
-      if (socket) {
-        // Set up listener first
-        const handleBettingInfo = (data: { userBalance: number | string; roomId?: string }) => {
-          const balanceValue = typeof data.userBalance === 'number' 
-            ? data.userBalance 
-            : Number(data.userBalance || 0);
-          setBalance(balanceValue);
-          // Remove listener after receiving data
-          socket.off('betting_info', handleBettingInfo);
-        };
-        
-        socket.on('betting_info', handleBettingInfo);
-        socket.emit('get_betting_info');
-        
-        // Cleanup listener after 5 seconds if no response
-        setTimeout(() => {
-          socket.off('betting_info', handleBettingInfo);
-        }, 5000);
+      // Get balance from API endpoint (works even when not in a room)
+      const { authenticatedFetch } = await import('../utils/api');
+      const { API_ENDPOINTS } = await import('../config/api');
+      const response = await authenticatedFetch(API_ENDPOINTS.PIX.BALANCE);
+      if (response.ok) {
+        const data = await response.json();
+        const balanceValue = typeof data.balance === 'number' 
+          ? data.balance 
+          : Number(data.balance || 0);
+        setBalance(balanceValue);
+      } else {
+        // Fallback to socket if API fails
+        const socket = getSocket();
+        if (socket) {
+          // Set up listener first
+          const handleBettingInfo = (data: { userBalance: number | string; roomId?: string }) => {
+            const balanceValue = typeof data.userBalance === 'number' 
+              ? data.userBalance 
+              : Number(data.userBalance || 0);
+            setBalance(balanceValue);
+            // Remove listener after receiving data
+            socket.off('betting_info', handleBettingInfo);
+          };
+          
+          socket.on('betting_info', handleBettingInfo);
+          socket.emit('get_betting_info');
+          
+          // Cleanup listener after 5 seconds if no response
+          setTimeout(() => {
+            socket.off('betting_info', handleBettingInfo);
+          }, 5000);
+        }
       }
     } catch (error) {
       console.error('Error fetching balance:', error);

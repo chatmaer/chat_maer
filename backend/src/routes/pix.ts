@@ -785,6 +785,23 @@ router.get("/pix-key/:userId", async (req, res) => {
   }
 });
 
+// Get user balance (for wallet modal - works even when not in a room)
+router.get("/balance", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const balance = await getUserBalance(userId);
+    res.json({ balance });
+  } catch (error) {
+    logger.error(error, "Error fetching user balance");
+    res.status(500).json({ error: "Failed to fetch balance" });
+  }
+});
+
 // Webhook endpoint for Mercado Pago payment notifications
 // NOTE: This endpoint should NOT use authenticateToken middleware as it's called by Mercado Pago
 // Configure this URL in Mercado Pago dashboard: https://www.mercadopago.com.ar/developers/en/docs/checkout-pro/payment-notifications
