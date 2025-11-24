@@ -9,69 +9,251 @@ import { createRequire } from "module";
 
 // Use createRequire to import CommonJS module in ESM context
 const require = createRequire(import.meta.url);
+
 let mercadopagoModule: any = null;
-let mercadopagoClient: any = null; // For v2.x SDK - the instantiated client
-let PaymentClass: any = null; // For v2.x SDK - the Payment class
+let mercadopagoClient: any = null;
+
 try {
   mercadopagoModule = require("mercadopago");
-  
-  // Log the structure for debugging
-  logger.info({ 
-    hasDefault: !!mercadopagoModule.default,
-    hasPayment: !!mercadopagoModule.Payment,
-    keys: Object.keys(mercadopagoModule),
-  }, "MercadoPago package structure");
-  
-} catch (error: any) {
-  logger.error({ error: error.message, stack: error.stack }, "Failed to import mercadopago package. Make sure it's installed: npm install mercadopago");
+  logger.info({ keys: Object.keys(mercadopagoModule) }, "mercadopago package loaded");
+} catch (err: any) {
+  logger.error({ err: err.message }, "mercadopago package not found. Run: npm i mercadopago");
   mercadopagoModule = null;
+}
+
+function initMercadoPagoClient() {
+  if (!mercadopagoModule) return null;
+
+  // Common init patterns:
+  // - v1: require('mercadopago'); mercadopago.configure({ access_token: '...' }) OR mercadopago.configurations.setAccessToken(...)
+  // - v2: const MP = require('mercadopago'); const client = new MP({ accessToken: '...' }) or MP.MercadoPago
+  // We'll try a few patterns and return a client object with standardized shape.
+  try {
+    // 1) If module has default export that is a class or function
+    const exported = mercadopagoModule.default ?? mercadopagoModule;
+
+    // If it is a class constructor (v2)
+    if (typeof exported === "function" && exported.name && /MercadoPago|Mercadopago/i.test(exported.name)) {
+      try {
+        const client = new exported({ accessToken: config.mercadoPago.accessToken });
+        logger.info("Initialized MercadoPago as class instance (new exported(...))");
+        return client;
+      } catch (e) {
+        // fallback
+        logger.warn({ err: (e as Error).message }, "new MercadoPago(...) failed, trying configure() fallback");
+      }
+    }
+
+    // 2) If module exposes MercadoPago property/class
+    if (mercadopagoModule.MercadoPago && typeof mercadopagoModule.MercadoPago === "function") {
+      try {
+        const client = new mercadopagoModule.MercadoPago({ accessToken: config.mercadoPago.accessToken });
+        logger.info("Initialized MercadoPago via mercadopago.MercadoPago class");
+        return client;
+      } catch (e) {
+        logger.warn({ err: (e as Error).message }, "mercadopago.MercadoPago(...) failed");
+      }
+    }
+
+    // 3) If module has configure or configurations.setAccessToken (v1 style)
+    if (mercadopagoModule.configure && typeof mercadopagoModule.configure === "function") {
+      try {
+        mercadopagoModule.configure({ access_token: config.mercadoPago.accessToken });
+        logger.info("Initialized MercadoPago via configure()");
+        return mercadopagoModule;
+      } catch (e) {
+        logger.warn({ err: (e as Error).message }, "mercadopago.configure failed");
+      }
+    }
+
+    if (mercadopagoModule.configurations && typeof mercadopagoModule.configurations.setAccessToken === "function") {
+      try {
+        mercadopagoModule.configurations.setAccessToken(config.mercadoPago.accessToken);
+        logger.info("Initialized MercadoPago via configurations.setAccessToken()");
+        return mercadopagoModule;
+      } catch (e) {
+        logger.warn({ err: (e as Error).message }, "mercadopago.configurations.setAccessToken failed");
+      }
+    }
+
+    // Otherwise, attempt to instantiate if module itself is a constructor
+    if (typeof mercadopagoModule === "function") {
+      try {
+        const client = new mercadopagoModule({ accessToken: config.mercadoPago.accessToken });
+        logger.info("Initialized MercadoPago via direct constructor");
+        return client;
+      } catch (e) {
+        logger.warn({ err: (e as Error).message }, "Direct constructor attempt failed");
+      }
+    }
+
+    // If we get here, return the module in case it has usable methods directly
+    logger.info("Falling back to using mercadopago module object directly");
+    return mercadopagoModule;
+  } catch (error: any) {
+    logger.error({ error: error.message }, "initMercadoPagoClient failed");
+    return null;
+  }
+}
+
+// initialize once
+if (config.mercadoPago.accessToken) {
+  mercadopagoClient = initMercadoPagoClient();
+  if (!mercadopagoClient) {
+    logger.error("Mercado Pago client initialization failed. Check package version and access token.");
+  }
+} else {
+  logger.warn("Mercado Pago access token missing in config");
+}
+
+// Helper: create payment and normalize result across SDK versions
+async function createPaymentWithMercadoPago(paymentData: any) {
+  if (!mercadopagoClient) throw new Error("Mercado Pago client not initialized");
+
+  // Try common invocation patterns:
+  // v1: mercadopago.payment.create(paymentData) => { response: {...} }
+  // v2: client.payments.create({ body: paymentData }) => returns object (maybe in .body or directly)
+  // alternative shapes: client.payment.create({ body: paymentData })
+
+  // We'll attempt a sequence and normalize result to { id, status, status_detail, point_of_interaction }
+  const diagnostics: any[] = [];
+
+  // helper to normalize candidate response object to common shape
+  function normalize(resp: any) {
+    // candidate resp may be:
+    // - { response: {...} }
+    // - { body: {...} }
+    // - direct payment object
+
+    const candidate = resp?.response ?? resp?.body ?? resp;
+    if (!candidate) return null;
+
+    const id = candidate.id ?? (candidate.payment_id ?? null);
+    const status = candidate.status ?? candidate.payment_status ?? null;
+    const status_detail = candidate.status_detail ?? null;
+    const poi = candidate.point_of_interaction ?? candidate.point_of_interaction ?? null;
+
+    return {
+      raw: candidate,
+      id,
+      status,
+      status_detail,
+      point_of_interaction: poi,
+    };
+  }
+
+  // Attempt patterns
+  try {
+    // pattern 1: mercadopagoClient.payment.create(paymentData) (v1)
+    if (mercadopagoClient.payment && typeof mercadopagoClient.payment.create === "function") {
+      diagnostics.push("calling mercadopagoClient.payment.create(paymentData)");
+      const r = await mercadopagoClient.payment.create(paymentData);
+      const n = normalize(r);
+      if (n) return { normalized: n, diagnostics };
+    }
+
+    // pattern 1b: mercadopagoClient.payment.create({ body: paymentData })
+    if (mercadopagoClient.payment && typeof mercadopagoClient.payment.create === "function") {
+      diagnostics.push("calling mercadopagoClient.payment.create({ body }) (alternate)");
+      const r = await mercadopagoClient.payment.create({ body: paymentData });
+      const n = normalize(r);
+      if (n) return { normalized: n, diagnostics };
+    }
+
+    // pattern 2: mercadopagoClient.payments.create({ body })
+    if (mercadopagoClient.payments && typeof mercadopagoClient.payments.create === "function") {
+      diagnostics.push("calling mercadopagoClient.payments.create({ body })");
+      const r = await mercadopagoClient.payments.create({ body: paymentData });
+      const n = normalize(r);
+      if (n) return { normalized: n, diagnostics };
+    }
+
+    // pattern 3: mercadopagoClient.payment.create when mercadopagoClient is module itself (some versions)
+    if (typeof mercadopagoClient.create === "function") {
+      diagnostics.push("calling mercadopagoClient.create(paymentData)");
+      const r = await mercadopagoClient.create(paymentData);
+      const n = normalize(r);
+      if (n) return { normalized: n, diagnostics };
+    }
+
+    // pattern 4: fallback to direct POST using the SDK client if it exposes a post function
+    if (typeof mercadopagoClient.post === "function") {
+      diagnostics.push("calling mercadopagoClient.post('/v1/payments', paymentData)");
+      const r = await mercadopagoClient.post({ uri: "/v1/payments", data: paymentData });
+      const n = normalize(r);
+      if (n) return { normalized: n, diagnostics };
+    }
+
+    // final fallback: try calling the rest client if present
+    if (mercadopagoModule && typeof mercadopagoModule === "object" && mercadopagoModule.post) {
+      diagnostics.push("calling mercadopagoModule.post('/v1/payments', ...)");
+      const r = await mercadopagoModule.post({ uri: "/v1/payments", data: paymentData });
+      const n = normalize(r);
+      if (n) return { normalized: n, diagnostics };
+    }
+
+    throw new Error("No supported mercadopago client method found");
+  } catch (err: any) {
+    logger.error({ err: err.message, diagnostics }, "createPaymentWithMercadoPago failed");
+    // make the error message more friendly upstream
+    const e: any = new Error("Mercado Pago payment creation failed");
+    e.cause = { diagnostics, inner: err?.message ?? err };
+    throw e;
+  }
+}
+
+// Helper: get payment status by paymentId (normalizes)
+async function getPaymentStatusFromMercadoPago(paymentId: string | number) {
+  if (!mercadopagoClient) throw new Error("Mercado Pago client not initialized");
+
+  const diagnostics: any[] = [];
+
+  try {
+    // pattern A: mercadopagoClient.payment.findById(id)
+    if (mercadopagoClient.payment && typeof mercadopagoClient.payment.findById === "function") {
+      diagnostics.push("calling mercadopagoClient.payment.findById");
+      const r = await mercadopagoClient.payment.findById(Number(paymentId));
+      const candidate = r?.response ?? r?.body ?? r;
+      return { candidate, diagnostics };
+    }
+
+    // pattern B: mercadopagoClient.payments.get({ id })
+    if (mercadopagoClient.payments && typeof mercadopagoClient.payments.get === "function") {
+      diagnostics.push("calling mercadopagoClient.payments.get");
+      const r = await mercadopagoClient.payments.get({ id: Number(paymentId) });
+      const candidate = r?.response ?? r?.body ?? r;
+      return { candidate, diagnostics };
+    }
+
+    // pattern C: mercadopagoClient.payment.get({ id })
+    if (mercadopagoClient.payment && typeof mercadopagoClient.payment.get === "function") {
+      diagnostics.push("calling mercadopagoClient.payment.get");
+      const r = await mercadopagoClient.payment.get({ id: Number(paymentId) });
+      const candidate = r?.response ?? r?.body ?? r;
+      return { candidate, diagnostics };
+    }
+
+    // fallback: perform raw GET to /v1/payments/{id} if library exposes rest
+    if (mercadopagoModule && typeof mercadopagoModule.get === "function") {
+      diagnostics.push("calling mercadopagoModule.get('/v1/payments/{id}') fallback");
+      const r = await mercadopagoModule.get({ uri: `/v1/payments/${paymentId}` });
+      const candidate = r?.response ?? r?.body ?? r;
+      return { candidate, diagnostics };
+    }
+
+    throw new Error("No supported mercadopago client method for get status");
+  } catch (err: any) {
+    logger.error({ err: err.message, diagnostics }, "getPaymentStatusFromMercadoPago failed");
+    const e: any = new Error("Failed to fetch payment status from Mercado Pago");
+    e.cause = { diagnostics, inner: err?.message ?? err };
+    throw e;
+  }
 }
 
 const router = express.Router();
 
 // Use JWT authentication middleware for all pix routes
 router.use(authenticateToken);
-
-// Initialize Mercado Pago SDK
-if (config.mercadoPago.accessToken) {
-  if (!mercadopagoModule) {
-    logger.error("Mercado Pago SDK is not available. Package may not be installed. Run: npm install mercadopago");
-  } else {
-    try {
-      // v2.x SDK structure: default export is the client class, Payment is a separate class
-      if (mercadopagoModule.default && typeof mercadopagoModule.default === "function") {
-        // Instantiate the client
-        mercadopagoClient = new mercadopagoModule.default({
-          accessToken: config.mercadoPago.accessToken,
-        });
-        
-        // Get the Payment class
-        if (mercadopagoModule.Payment && typeof mercadopagoModule.Payment === "function") {
-          PaymentClass = mercadopagoModule.Payment;
-          logger.info("Mercado Pago SDK v2.x initialized successfully");
-        } else {
-          logger.error("Payment class not found in Mercado Pago SDK");
-        }
-      } else if (mercadopagoModule.configurations && mercadopagoModule.configurations.setAccessToken) {
-        // v1.x: Use configurations.setAccessToken
-        mercadopagoModule.configurations.setAccessToken(config.mercadoPago.accessToken);
-        mercadopagoClient = mercadopagoModule; // Use the same object for v1.x
-        logger.info("Mercado Pago SDK v1.x initialized successfully");
-      } else {
-        logger.error({
-          hasDefault: !!mercadopagoModule.default,
-          hasPayment: !!mercadopagoModule.Payment,
-          hasConfigurations: !!mercadopagoModule.configurations,
-          keys: Object.keys(mercadopagoModule || {}),
-        }, "Mercado Pago SDK failed to initialize. Package structure is unexpected. Check package version and installation.");
-      }
-    } catch (error: any) {
-      logger.error({ error: error.message, stack: error.stack }, "Failed to initialize MercadoPago SDK");
-    }
-  }
-} else {
-  logger.warn("Mercado Pago access token not configured. Pix integration will not work.");
-}
 
 // Request Pix deposit (creates QR code)
 router.post("/deposit/request", async (req: AuthRequest, res) => {
@@ -150,56 +332,31 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
       external_reference: transactionId, // Link to our transaction ID
     };
 
-    // Create payment with Mercado Pago (supports both v1.x and v2.x)
-    let paymentResponse: any;
-    let payment: any;
-    
-    if (PaymentClass && mercadopagoClient) {
-      // v2.x API: Use Payment class with client instance
-      try {
-        const paymentInstance = new PaymentClass(mercadopagoClient);
-        paymentResponse = await paymentInstance.create({ body: paymentData });
-        payment = paymentResponse;
-      } catch (error: any) {
-        logger.error({ error: error.message, stack: error.stack }, "Error creating payment with v2.x SDK");
-        throw error;
-      }
-    } else if (mercadopagoClient.payment && mercadopagoClient.payment.create) {
-      // v1.x API
-      paymentResponse = await mercadopagoClient.payment.create(paymentData);
-      payment = paymentResponse.response;
-    } else {
-      logger.error({ 
-        hasPaymentClass: !!PaymentClass,
-        hasClient: !!mercadopagoClient,
-        hasPayment: !!(mercadopagoClient && mercadopagoClient.payment),
-        clientKeys: mercadopagoClient ? Object.keys(mercadopagoClient) : []
-      }, "MercadoPago client structure is unexpected");
-      return res.status(500).json({ error: "Failed to create payment: SDK structure incompatibility" });
-    }
+    // Create payment and normalize
+    const { normalized, diagnostics } = await createPaymentWithMercadoPago(paymentData).catch((e) => { throw e; });
 
-    // Extract QR code information
-    const qrCode = payment.point_of_interaction?.transaction_data?.qr_code || null;
-    const qrCodeBase64 = payment.point_of_interaction?.transaction_data?.qr_code_base64 || null;
-    
+    const payment = normalized.raw;
+    const paymentId = normalized.id ?? (payment?.id ?? null);
+    const status = normalized.status ?? payment?.status ?? null;
+    const poi = normalized.point_of_interaction ?? payment?.point_of_interaction ?? null;
+
+    // Attempt to read QR info
+    const qrCode = poi?.transaction_data?.qr_code ?? null;
+    const qrCodeBase64 = poi?.transaction_data?.qr_code_base64 ?? null;
+
     if (!qrCode || !qrCodeBase64) {
-      logger.error({ payment }, "Mercado Pago payment created but QR code not found");
-      return res.status(500).json({ error: "Failed to generate QR code" });
+      logger.error({ normalized, diagnostics, payment }, "Payment created but QR code not found");
+      return res.status(500).json({ error: "Failed to generate QR code", details: "qr_code missing from response" });
     }
 
     // Calculate expiration time (Mercado Pago Pix QR codes typically expire in 30 minutes)
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+    // Format as MySQL DATETIME: 'YYYY-MM-DD HH:mm:ss' (no milliseconds, no timezone)
+    const expiresAtDate = new Date(Date.now() + 30 * 60 * 1000);
+    const expiresAt = expiresAtDate.toISOString().slice(0, 19).replace('T', ' ');
 
-    // Store QR code data
-    const qrCodeData = {
-      qrCode,
-      qrCodeBase64,
-      transactionId,
-      expiresAt,
-      mercadoPagoPaymentId: payment.id,
-    };
+    // Save to DB
+    const qrCodeData = { qrCode, qrCodeBase64, transactionId, expiresAt, mercadoPagoPaymentId: String(paymentId) };
 
-    // Create pending transaction in database
     await query(
       `INSERT INTO pix_transactions 
        (id, user_id, transaction_type, amount, status, qr_code, qr_code_expires_at, balance_before, pix_transaction_id)
@@ -211,13 +368,11 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
         JSON.stringify(qrCodeData),
         expiresAt,
         userBalance,
-        payment.id.toString(),
+        String(paymentId),
       ],
     );
 
-    logger.info(
-      `Pix deposit request created: userId=${userId}, amount=${amount}, paymentId=${payment.id}`,
-    );
+    logger.info(`Pix deposit request created: userId=${userId}, amount=${amount}, paymentId=${paymentId}`);
 
     res.json({
       transactionId,
@@ -225,25 +380,14 @@ router.post("/deposit/request", async (req: AuthRequest, res) => {
       qrCodeBase64: `data:image/jpeg;base64,${qrCodeBase64}`,
       expiresAt,
       amount,
-      paymentId: payment.id,
-      status: payment.status,
+      paymentId,
+      status,
       message: "Pix deposit request created. Scan QR code to complete payment.",
     });
   } catch (error: any) {
-    logger.error(error, "Error in Pix deposit request");
-    
-    // Handle Mercado Pago API errors
-    let errorMessage = "Failed to create Pix deposit request";
-    let errorStatus = 500;
-
-    if (error.cause && Array.isArray(error.cause) && error.cause.length > 0) {
-      errorMessage = error.cause[0].description || errorMessage;
-      errorStatus = error.status || errorStatus;
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-
-    res.status(errorStatus).json({ error: errorMessage });
+    logger.error({ err: error.message, cause: error.cause ?? null }, "Error in Pix deposit request");
+    // Provide diagnostics but avoid leaking sensitive data to clients
+    res.status(500).json({ error: error.message || "Failed to create Pix deposit request" });
   }
 });
 
@@ -289,104 +433,63 @@ router.get("/deposit/status/:transactionId", async (req: AuthRequest, res) => {
     const tx = transaction[0];
     const mercadoPagoPaymentId = tx.pix_transaction_id;
 
-    // If we have a Mercado Pago payment ID, check the payment status
-    if (mercadoPagoPaymentId) {
-      if (!mercadopagoClient) {
-        logger.warn("Mercado Pago SDK is not available. Returning database status only.");
-      } else {
-        try {
-          let paymentResponse: any;
-          let payment: any;
-          
-          if (PaymentClass && mercadopagoClient) {
-            // v2.x API: Use Payment class with client instance
-            const paymentInstance = new PaymentClass(mercadopagoClient);
-            paymentResponse = await paymentInstance.get({ id: Number(mercadoPagoPaymentId) });
-            payment = paymentResponse;
-          } else if (mercadopagoClient.payment && mercadopagoClient.payment.findById) {
-            // v1.x API
-            paymentResponse = await mercadopagoClient.payment.findById(Number(mercadoPagoPaymentId));
-            payment = paymentResponse.response;
-          } else {
-            throw new Error("Payment get/findById method not found in SDK");
-          }
+    // If we have a Mercado Pago payment id, attempt to fetch current payment info
+    if (tx.pix_transaction_id && mercadopagoClient) {
+      try {
+        const { candidate } = await getPaymentStatusFromMercadoPago(tx.pix_transaction_id);
+        const payment = candidate;
+        const mpStatus = payment?.status ?? null;
 
-        // Map Mercado Pago status to our status
         let newStatus = tx.status;
-        if (payment.status === "approved") {
+        if (mpStatus === "approved") {
           newStatus = "completed";
-          // If payment is approved but our transaction is still pending, update it
           if (tx.status === "pending" || tx.status === "processing") {
-            const amount = typeof tx.amount === 'number' ? tx.amount : Number(tx.amount || 0);
+            const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
             const currentBalance = await getUserBalance(userId);
             const newBalance = currentBalance + amount;
 
             await updateUserBalance(userId, newBalance);
 
-            await query(
-              `UPDATE pix_transactions 
-               SET status = 'completed', balance_after = ?, updated_at = NOW()
-               WHERE id = ?`,
-              [newBalance, transactionId],
-            );
-
-            logger.info(
-              `Pix deposit completed: userId=${userId}, amount=${amount}, newBalance=${newBalance}`,
-            );
+            await query(`UPDATE pix_transactions SET status = 'completed', balance_after = ?, updated_at = NOW() WHERE id = ?`, [newBalance, transactionId]);
+            logger.info(`Pix deposit completed: userId=${userId}, amount=${amount}, newBalance=${newBalance}`);
           }
-        } else if (payment.status === "rejected" || payment.status === "cancelled") {
+        } else if (mpStatus === "rejected" || mpStatus === "cancelled") {
           newStatus = "failed";
           if (tx.status === "pending" || tx.status === "processing") {
-            await query(
-              `UPDATE pix_transactions 
-               SET status = 'failed', error_message = ?, updated_at = NOW()
-               WHERE id = ?`,
-              [payment.status_detail || "Payment rejected", transactionId],
-            );
+            await query(`UPDATE pix_transactions SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, [payment?.status_detail ?? mpStatus, transactionId]);
           }
-        } else if (payment.status === "pending" || payment.status === "in_process") {
+        } else if (mpStatus === "pending" || mpStatus === "in_process") {
           newStatus = "processing";
           if (tx.status === "pending") {
-            await query(
-              `UPDATE pix_transactions 
-               SET status = 'processing', updated_at = NOW()
-               WHERE id = ?`,
-              [transactionId],
-            );
+            await query(`UPDATE pix_transactions SET status = 'processing', updated_at = NOW() WHERE id = ?`, [transactionId]);
           }
         }
 
-        const balanceAfter = typeof tx.balance_after === 'number' 
-          ? tx.balance_after 
-          : (tx.balance_after ? Number(tx.balance_after) : null);
+        const balanceAfter = typeof tx.balance_after === "number" ? tx.balance_after : (tx.balance_after ? Number(tx.balance_after) : null);
 
         return res.json({
           transactionId: tx.id,
-          amount: typeof tx.amount === 'number' ? tx.amount : Number(tx.amount || 0),
+          amount: typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0),
           status: newStatus,
-          balanceAfter: balanceAfter,
+          balanceAfter,
           errorMessage: tx.error_message,
           createdAt: tx.created_at,
           updatedAt: tx.updated_at,
-          mercadoPagoStatus: payment.status,
+          mercadoPagoStatus: mpStatus,
         });
-        } catch (mpError: any) {
-          logger.error(mpError, "Error checking Mercado Pago payment status");
-          // Fall through to return database status
-        }
+      } catch (mpErr: any) {
+        logger.error(mpErr, "Error checking Mercado Pago payment status, returning DB status");
+        // fallthrough and return DB status
       }
     }
 
-    // Return database status if we can't check Mercado Pago
-    const balanceAfter = typeof tx.balance_after === 'number' 
-      ? tx.balance_after 
-      : (tx.balance_after ? Number(tx.balance_after) : null);
-
+    // Fallback: return DB status
+    const balanceAfter = typeof tx.balance_after === "number" ? tx.balance_after : (tx.balance_after ? Number(tx.balance_after) : null);
     res.json({
       transactionId: tx.id,
-      amount: typeof tx.amount === 'number' ? tx.amount : Number(tx.amount || 0),
+      amount: typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0),
       status: tx.status,
-      balanceAfter: balanceAfter,
+      balanceAfter,
       errorMessage: tx.error_message,
       createdAt: tx.created_at,
       updatedAt: tx.updated_at,
@@ -642,6 +745,95 @@ router.get("/pix-key/:userId", async (req, res) => {
   } catch (error) {
     logger.error(error, "Error fetching Pix key");
     res.status(500).json({ error: "Failed to fetch Pix key" });
+  }
+});
+
+// Webhook endpoint for Mercado Pago payment notifications
+// NOTE: This endpoint should NOT use authenticateToken middleware as it's called by Mercado Pago
+// Configure this URL in Mercado Pago dashboard: https://www.mercadopago.com.ar/developers/en/docs/checkout-pro/payment-notifications
+router.post("/webhook", async (req, res) => {
+  try {
+    // Mercado Pago sends notifications with payment data
+    // The notification structure can vary, but typically includes:
+    // - type: "payment"
+    // - data: { id: "payment_id" }
+    const { type, data } = req.body;
+
+    if (type === "payment" && data?.id) {
+      const paymentId = String(data.id);
+
+      // Find the transaction by Mercado Pago payment ID
+      const transactions = (await query(
+        `SELECT id, user_id, amount, status FROM pix_transactions 
+         WHERE pix_transaction_id = ? AND transaction_type = 'deposit'`,
+        [paymentId],
+      )) as Array<{
+        id: string;
+        user_id: string;
+        amount: number | string;
+        status: string;
+      }>;
+
+      if (transactions.length > 0) {
+        const tx = transactions[0];
+
+        // Fetch current payment status from Mercado Pago
+        if (mercadopagoClient) {
+          try {
+            const { candidate } = await getPaymentStatusFromMercadoPago(paymentId);
+            const payment = candidate;
+            const mpStatus = payment?.status ?? null;
+
+            if (mpStatus === "approved" && (tx.status === "pending" || tx.status === "processing")) {
+              const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
+              const currentBalance = await getUserBalance(tx.user_id);
+              const newBalance = currentBalance + amount;
+
+              await updateUserBalance(tx.user_id, newBalance);
+
+              await query(
+                `UPDATE pix_transactions 
+                 SET status = 'completed', balance_after = ?, updated_at = NOW() 
+                 WHERE id = ?`,
+                [newBalance, tx.id],
+              );
+
+              logger.info(`Pix deposit completed via webhook: userId=${tx.user_id}, amount=${amount}, newBalance=${newBalance}`);
+            } else if (mpStatus === "rejected" || mpStatus === "cancelled") {
+              if (tx.status === "pending" || tx.status === "processing") {
+                await query(
+                  `UPDATE pix_transactions 
+                   SET status = 'failed', error_message = ?, updated_at = NOW() 
+                   WHERE id = ?`,
+                  [payment?.status_detail ?? mpStatus, tx.id],
+                );
+                logger.info(`Pix deposit failed via webhook: transactionId=${tx.id}, status=${mpStatus}`);
+              }
+            } else if (mpStatus === "pending" || mpStatus === "in_process") {
+              if (tx.status === "pending") {
+                await query(
+                  `UPDATE pix_transactions 
+                   SET status = 'processing', updated_at = NOW() 
+                   WHERE id = ?`,
+                  [tx.id],
+                );
+              }
+            }
+          } catch (mpErr: any) {
+            logger.error({ err: mpErr.message }, "Error processing webhook payment status");
+          }
+        }
+      } else {
+        logger.warn(`Webhook received for unknown payment: ${paymentId}`);
+      }
+    }
+
+    // Always return 200 to acknowledge receipt
+    res.status(200).json({ received: true });
+  } catch (error: any) {
+    logger.error({ err: error.message }, "Error processing Mercado Pago webhook");
+    // Still return 200 to prevent Mercado Pago from retrying
+    res.status(200).json({ received: true, error: "Processing failed but acknowledged" });
   }
 });
 
