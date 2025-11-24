@@ -875,7 +875,13 @@ export default function AdminPanel() {
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-red-100 text-red-800'
                               }`}>
-                                {withdrawal.status}
+                                {withdrawal.status === 'pending' 
+                                  ? t('admin.pending')
+                                  : withdrawal.status === 'completed'
+                                  ? t('admin.completed')
+                                  : withdrawal.status === 'failed'
+                                  ? t('admin.failed')
+                                  : withdrawal.status}
                               </span>
                             </td>
                             <td className="px-4 py-3">
