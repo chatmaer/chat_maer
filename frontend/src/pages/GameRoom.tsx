@@ -57,11 +57,25 @@ export default function GameRoom({
     },
   ]);
 
-  // Update initial message with translation when component mounts (only if still using default)
+  // Update initial message with translation when component mounts or language changes
   useEffect(() => {
     setMessages((prev) => {
-      // Only update if we still have the default welcome message
-      if (prev.length === 1 && prev[0].id === '1' && prev[0].sender === 'System' && prev[0].text === 'Welcome to the game room! Good luck!') {
+      // Find the system message (by ID '1' or by checking if it's the system sender)
+      const systemMessageIndex = prev.findIndex(msg => msg.id === '1' || msg.sender === t('gameRoom.system') || msg.sender === 'System');
+      
+      if (systemMessageIndex !== -1) {
+        // Update the system message with current translations
+        const updatedMessages = [...prev];
+        updatedMessages[systemMessageIndex] = {
+          id: '1',
+          sender: t('gameRoom.system'),
+          text: t('gameRoom.welcomeMessage'),
+          timestamp: prev[systemMessageIndex].timestamp,
+          isOwn: false,
+        };
+        return updatedMessages;
+      } else if (prev.length === 0) {
+        // If no messages, add the system message
         return [
           {
             id: '1',
@@ -368,17 +382,17 @@ export default function GameRoom({
       
       // Show notification about game result
       if (data.isDraw) {
-        showNotificationRef.current('Game ended in a draw!', 'info');
+        showNotificationRef.current(t('notifications.gameEndedDraw'), 'info');
       } else if (data.winner || data.winningTeam) {
         const winnerTeam = data.winner || data.winningTeam;
         const playerTeam = getPlayerTeam();
         if (winnerTeam === playerTeam) {
-          showNotificationRef.current('🎉 Congratulations! You won the game!', 'success');
+          showNotificationRef.current(t('notifications.congratulations'), 'success');
         } else {
           // Find opponent username (the one who is not the current user)
           const opponent = players.find((p: any) => p.id !== userId);
-          const opponentUsername = opponent?.username || 'Opponent';
-          showNotificationRef.current(`${opponentUsername} won the game!`, 'info');
+          const opponentUsername = opponent?.username || t('common.opponent');
+          showNotificationRef.current(t('notifications.opponentWonGame', { username: opponentUsername }), 'info');
         }
       }
     };
@@ -403,13 +417,13 @@ export default function GameRoom({
         const currentUserId = userId || propUserId;
         const historyMessages: Message[] = data.messages.map((msg: any) => ({
           id: msg.id || Date.now().toString(),
-          sender: msg.username || 'Unknown',
+          sender: msg.username || t('common.unknown'),
           text: msg.message,
           timestamp: new Date(msg.timestamp || Date.now()),
           isOwn: msg.userId === currentUserId,
         }));
         // Replace messages with history (but keep system message if exists)
-        const systemMessage = messages.find(msg => msg.sender === 'System');
+        const systemMessage = messages.find(msg => msg.id === '1');
         setMessages(systemMessage ? [systemMessage, ...historyMessages] : historyMessages);
         console.log('Loaded chat history:', historyMessages.length, 'messages');
       }
@@ -425,7 +439,7 @@ export default function GameRoom({
       if (!isOwnMessage) {
         const newMessage: Message = {
           id: data.id || Date.now().toString(),
-          sender: data.username || 'Unknown',
+          sender: data.username || t('common.unknown'),
           text: data.message,
           timestamp: new Date(data.timestamp || Date.now()),
           isOwn: false,
@@ -458,8 +472,8 @@ export default function GameRoom({
 
       // Find opponent username who left
       const leftPlayer = players.find((p: any) => p.id === data.userId);
-      const opponentUsername = leftPlayer?.username || 'Opponent';
-      showNotificationRef.current(`${opponentUsername} left the game`, 'info');
+      const opponentUsername = leftPlayer?.username || t('common.opponent');
+      showNotificationRef.current(t('notifications.playerLeft', { username: opponentUsername }), 'info');
       
       // Set waiting state - moves disabled until new player joins
       setIsWaiting(true);
@@ -495,7 +509,7 @@ export default function GameRoom({
 
     // Listen for account banned
     const handleAccountBanned = (data: { message: string }) => {
-      showNotificationRef.current(data.message || 'Your account has been banned', 'error');
+      showNotificationRef.current(data.message || t('notifications.accountBanned'), 'error');
       // Redirect to login after a delay
       setTimeout(() => {
         onExitRoomRef.current();
@@ -548,7 +562,7 @@ export default function GameRoom({
     const tempId = `temp-${Date.now()}-${Math.random()}`;
     const newMessage: Message = {
       id: tempId,
-      sender: 'You',
+      sender: t('common.you'),
       text,
       timestamp: new Date(),
       isOwn: true,
