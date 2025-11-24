@@ -109,11 +109,12 @@ if (config.mercadoPago.accessToken) {
 // Helper: create payment and normalize result across SDK versions
 async function createPaymentWithMercadoPago(paymentData: any) {
   if (!mercadopagoClient) throw new Error("Mercado Pago client not initialized");
+  if (!mercadopagoModule) throw new Error("Mercado Pago module not loaded");
 
   // Try common invocation patterns:
   // v1: mercadopago.payment.create(paymentData) => { response: {...} }
-  // v2: client.payments.create({ body: paymentData }) => returns object (maybe in .body or directly)
-  // alternative shapes: client.payment.create({ body: paymentData })
+  // v2: new Payment(client).create({ body: paymentData }) => returns object directly
+  // v2 alt: client.payments.create({ body: paymentData })
 
   // We'll attempt a sequence and normalize result to { id, status, status_detail, point_of_interaction }
   const diagnostics: any[] = [];
@@ -144,12 +145,30 @@ async function createPaymentWithMercadoPago(paymentData: any) {
 
   // Attempt patterns
   try {
+    // pattern 0: v2.x SDK - Use Payment class with client instance (CORRECT PATTERN FOR v2.10.0)
+    if (mercadopagoModule.Payment && typeof mercadopagoModule.Payment === "function" && mercadopagoClient) {
+      try {
+        diagnostics.push("calling new Payment(client).create({ body: paymentData })");
+        const PaymentClass = mercadopagoModule.Payment;
+        const paymentInstance = new PaymentClass(mercadopagoClient);
+        const r = await paymentInstance.create({ body: paymentData });
+        const n = normalize(r);
+        if (n && n.id) {
+          logger.info({ paymentId: n.id, diagnostics }, "Payment created successfully using Payment class");
+          return { normalized: n, diagnostics };
+        }
+      } catch (err: any) {
+        diagnostics.push(`Payment class pattern failed: ${err.message}`);
+        logger.warn({ err: err.message }, "Payment class pattern failed, trying other patterns");
+      }
+    }
+
     // pattern 1: mercadopagoClient.payment.create(paymentData) (v1)
     if (mercadopagoClient.payment && typeof mercadopagoClient.payment.create === "function") {
       diagnostics.push("calling mercadopagoClient.payment.create(paymentData)");
       const r = await mercadopagoClient.payment.create(paymentData);
       const n = normalize(r);
-      if (n) return { normalized: n, diagnostics };
+      if (n && n.id) return { normalized: n, diagnostics };
     }
 
     // pattern 1b: mercadopagoClient.payment.create({ body: paymentData })
@@ -157,7 +176,7 @@ async function createPaymentWithMercadoPago(paymentData: any) {
       diagnostics.push("calling mercadopagoClient.payment.create({ body }) (alternate)");
       const r = await mercadopagoClient.payment.create({ body: paymentData });
       const n = normalize(r);
-      if (n) return { normalized: n, diagnostics };
+      if (n && n.id) return { normalized: n, diagnostics };
     }
 
     // pattern 2: mercadopagoClient.payments.create({ body })
@@ -165,7 +184,7 @@ async function createPaymentWithMercadoPago(paymentData: any) {
       diagnostics.push("calling mercadopagoClient.payments.create({ body })");
       const r = await mercadopagoClient.payments.create({ body: paymentData });
       const n = normalize(r);
-      if (n) return { normalized: n, diagnostics };
+      if (n && n.id) return { normalized: n, diagnostics };
     }
 
     // pattern 3: mercadopagoClient.payment.create when mercadopagoClient is module itself (some versions)
@@ -173,7 +192,7 @@ async function createPaymentWithMercadoPago(paymentData: any) {
       diagnostics.push("calling mercadopagoClient.create(paymentData)");
       const r = await mercadopagoClient.create(paymentData);
       const n = normalize(r);
-      if (n) return { normalized: n, diagnostics };
+      if (n && n.id) return { normalized: n, diagnostics };
     }
 
     // pattern 4: fallback to direct POST using the SDK client if it exposes a post function
@@ -181,7 +200,7 @@ async function createPaymentWithMercadoPago(paymentData: any) {
       diagnostics.push("calling mercadopagoClient.post('/v1/payments', paymentData)");
       const r = await mercadopagoClient.post({ uri: "/v1/payments", data: paymentData });
       const n = normalize(r);
-      if (n) return { normalized: n, diagnostics };
+      if (n && n.id) return { normalized: n, diagnostics };
     }
 
     // final fallback: try calling the rest client if present
@@ -189,12 +208,12 @@ async function createPaymentWithMercadoPago(paymentData: any) {
       diagnostics.push("calling mercadopagoModule.post('/v1/payments', ...)");
       const r = await mercadopagoModule.post({ uri: "/v1/payments", data: paymentData });
       const n = normalize(r);
-      if (n) return { normalized: n, diagnostics };
+      if (n && n.id) return { normalized: n, diagnostics };
     }
 
     throw new Error("No supported mercadopago client method found");
   } catch (err: any) {
-    logger.error({ err: err.message, diagnostics }, "createPaymentWithMercadoPago failed");
+    logger.error({ err: err.message, diagnostics, clientKeys: mercadopagoClient ? Object.keys(mercadopagoClient) : [], moduleKeys: mercadopagoModule ? Object.keys(mercadopagoModule) : [] }, "createPaymentWithMercadoPago failed");
     // make the error message more friendly upstream
     const e: any = new Error("Mercado Pago payment creation failed");
     e.cause = { diagnostics, inner: err?.message ?? err };
@@ -205,16 +224,34 @@ async function createPaymentWithMercadoPago(paymentData: any) {
 // Helper: get payment status by paymentId (normalizes)
 async function getPaymentStatusFromMercadoPago(paymentId: string | number) {
   if (!mercadopagoClient) throw new Error("Mercado Pago client not initialized");
+  if (!mercadopagoModule) throw new Error("Mercado Pago module not loaded");
 
   const diagnostics: any[] = [];
 
   try {
+    // pattern 0: v2.x SDK - Use Payment class with client instance (CORRECT PATTERN FOR v2.10.0)
+    if (mercadopagoModule.Payment && typeof mercadopagoModule.Payment === "function" && mercadopagoClient) {
+      try {
+        diagnostics.push("calling new Payment(client).get({ id })");
+        const PaymentClass = mercadopagoModule.Payment;
+        const paymentInstance = new PaymentClass(mercadopagoClient);
+        const r = await paymentInstance.get({ id: Number(paymentId) });
+        const candidate = r?.response ?? r?.body ?? r;
+        if (candidate && candidate.id) {
+          return { candidate, diagnostics };
+        }
+      } catch (err: any) {
+        diagnostics.push(`Payment class pattern failed: ${err.message}`);
+        logger.warn({ err: err.message }, "Payment class get pattern failed, trying other patterns");
+      }
+    }
+
     // pattern A: mercadopagoClient.payment.findById(id)
     if (mercadopagoClient.payment && typeof mercadopagoClient.payment.findById === "function") {
       diagnostics.push("calling mercadopagoClient.payment.findById");
       const r = await mercadopagoClient.payment.findById(Number(paymentId));
       const candidate = r?.response ?? r?.body ?? r;
-      return { candidate, diagnostics };
+      if (candidate && candidate.id) return { candidate, diagnostics };
     }
 
     // pattern B: mercadopagoClient.payments.get({ id })
@@ -222,7 +259,7 @@ async function getPaymentStatusFromMercadoPago(paymentId: string | number) {
       diagnostics.push("calling mercadopagoClient.payments.get");
       const r = await mercadopagoClient.payments.get({ id: Number(paymentId) });
       const candidate = r?.response ?? r?.body ?? r;
-      return { candidate, diagnostics };
+      if (candidate && candidate.id) return { candidate, diagnostics };
     }
 
     // pattern C: mercadopagoClient.payment.get({ id })
@@ -230,7 +267,7 @@ async function getPaymentStatusFromMercadoPago(paymentId: string | number) {
       diagnostics.push("calling mercadopagoClient.payment.get");
       const r = await mercadopagoClient.payment.get({ id: Number(paymentId) });
       const candidate = r?.response ?? r?.body ?? r;
-      return { candidate, diagnostics };
+      if (candidate && candidate.id) return { candidate, diagnostics };
     }
 
     // fallback: perform raw GET to /v1/payments/{id} if library exposes rest
@@ -238,7 +275,7 @@ async function getPaymentStatusFromMercadoPago(paymentId: string | number) {
       diagnostics.push("calling mercadopagoModule.get('/v1/payments/{id}') fallback");
       const r = await mercadopagoModule.get({ uri: `/v1/payments/${paymentId}` });
       const candidate = r?.response ?? r?.body ?? r;
-      return { candidate, diagnostics };
+      if (candidate && candidate.id) return { candidate, diagnostics };
     }
 
     throw new Error("No supported mercadopago client method for get status");

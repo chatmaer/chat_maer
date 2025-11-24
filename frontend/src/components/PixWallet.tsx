@@ -3,6 +3,7 @@ import { Wallet, ArrowDownCircle, ArrowUpCircle, History, X, QrCode, Copy, Check
 import { useNotification } from '../contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { API_ENDPOINTS } from '../config/api';
+import { getSocket } from '../utils/socket';
 
 interface PixWalletProps {
   userId?: string;
@@ -65,13 +66,26 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
   const fetchBalance = async () => {
     if (!userId) return;
     try {
-      // Get balance from betting info endpoint or create a dedicated endpoint
-      const socket = (window as any).socket;
+      // Get balance from betting info endpoint using socket
+      const socket = getSocket();
       if (socket) {
+        // Set up listener first
+        const handleBettingInfo = (data: { userBalance: number | string; roomId?: string }) => {
+          const balanceValue = typeof data.userBalance === 'number' 
+            ? data.userBalance 
+            : Number(data.userBalance || 0);
+          setBalance(balanceValue);
+          // Remove listener after receiving data
+          socket.off('betting_info', handleBettingInfo);
+        };
+        
+        socket.on('betting_info', handleBettingInfo);
         socket.emit('get_betting_info');
-        socket.once('betting_info', (data: { userBalance: number }) => {
-          setBalance(data.userBalance || 0);
-        });
+        
+        // Cleanup listener after 5 seconds if no response
+        setTimeout(() => {
+          socket.off('betting_info', handleBettingInfo);
+        }, 5000);
       }
     } catch (error) {
       console.error('Error fetching balance:', error);
@@ -198,8 +212,12 @@ export default function PixWallet({ userId, onClose }: PixWalletProps) {
             setPayerFirstName('');
             setPayerLastName('');
             setPayerIdentificationNumber('');
-            fetchBalance();
-            fetchTransactions();
+            // Refresh balance and transactions
+            // Add a small delay to ensure backend has updated the balance
+            setTimeout(() => {
+              fetchBalance();
+              fetchTransactions();
+            }, 500);
           } else if (data.status === 'failed') {
             clearInterval(interval);
             showNotification(data.errorMessage || 'Deposit failed', 'error');
