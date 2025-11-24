@@ -2,6 +2,7 @@ import express from "express";
 import { query } from "../db/connection.js";
 import logger from "../lib/logger.js";
 import { authenticateToken, requireAdmin, AuthRequest } from "../middleware/auth.js";
+import { getUserBalance, updateUserBalance } from "../utils/roomManager.js";
 
 const router = express.Router();
 
@@ -318,6 +319,225 @@ router.post("/stats", async (req: AuthRequest, res) => {
   } catch (error) {
     logger.error(error, "Error fetching statistics");
     res.status(500).json({ error: "Failed to fetch statistics" });
+  }
+});
+
+// Get pending withdrawal requests
+router.post("/withdrawals", async (req: AuthRequest, res) => {
+  try {
+    const { page = 1, limit = 50, status = "pending" } = req.body;
+    const pageNum = Number(page) || 1;
+    const limitNum = Number(limit) || 50;
+    const offset = (pageNum - 1) * limitNum;
+
+    const safeLimit = Math.max(1, Math.min(limitNum, 1000));
+    const safeOffset = Math.max(0, offset);
+
+    // Get withdrawal requests with user information
+    const withdrawals = (await query(
+      `SELECT pt.id, pt.user_id, pt.amount, pt.status, pt.pix_key, pt.balance_before, 
+              pt.balance_after, pt.error_message, pt.created_at, pt.updated_at,
+              u.username, u.balance as current_balance
+       FROM pix_transactions pt
+       JOIN users u ON pt.user_id = u.id
+       WHERE pt.transaction_type = 'withdrawal' 
+       ${status !== "all" ? "AND pt.status = ?" : ""}
+       ORDER BY pt.created_at DESC
+       LIMIT ${safeLimit} OFFSET ${safeOffset}`,
+      status !== "all" ? [status] : [],
+    )) as Array<{
+      id: string;
+      user_id: string;
+      amount: number | string;
+      status: string;
+      pix_key: string | null;
+      balance_before: number | string | null;
+      balance_after: number | string | null;
+      error_message: string | null;
+      created_at: Date;
+      updated_at: Date;
+      username: string;
+      current_balance: number | string;
+    }>;
+
+    // Get total count
+    const countResult = (await query(
+      `SELECT COUNT(*) as total 
+       FROM pix_transactions 
+       WHERE transaction_type = 'withdrawal' 
+       ${status !== "all" ? "AND status = ?" : ""}`,
+      status !== "all" ? [status] : [],
+    )) as Array<{ total: number }>;
+    const total = countResult[0]?.total || 0;
+
+    res.json({
+      withdrawals: withdrawals.map((w) => ({
+        id: w.id,
+        userId: w.user_id,
+        username: w.username,
+        amount: typeof w.amount === "number" ? w.amount : Number(w.amount || 0),
+        status: w.status,
+        pixKey: w.pix_key, // Admin can see full Pix key
+        balanceBefore: typeof w.balance_before === "number" 
+          ? w.balance_before 
+          : (w.balance_before ? Number(w.balance_before) : null),
+        balanceAfter: typeof w.balance_after === "number" 
+          ? w.balance_after 
+          : (w.balance_after ? Number(w.balance_after) : null),
+        currentBalance: typeof w.current_balance === "number" 
+          ? w.current_balance 
+          : Number(w.current_balance || 0),
+        errorMessage: w.error_message,
+        createdAt: w.created_at,
+        updatedAt: w.updated_at,
+      })),
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
+  } catch (error) {
+    logger.error(error, "Error fetching withdrawal requests");
+    res.status(500).json({ error: "Failed to fetch withdrawal requests" });
+  }
+});
+
+// Approve withdrawal request
+router.post("/withdrawals/approve", async (req: AuthRequest, res) => {
+  try {
+    const { transactionId } = req.body;
+
+    if (!transactionId) {
+      return res.status(400).json({ error: "Transaction ID is required" });
+    }
+
+    // Get transaction details
+    const transaction = (await query(
+      `SELECT id, user_id, amount, status, balance_before, pix_key
+       FROM pix_transactions 
+       WHERE id = ? AND transaction_type = 'withdrawal'`,
+      [transactionId],
+    )) as Array<{
+      id: string;
+      user_id: string;
+      amount: number | string;
+      status: string;
+      balance_before: number | string | null;
+      pix_key: string | null;
+    }>;
+
+    if (transaction.length === 0) {
+      return res.status(404).json({ error: "Withdrawal request not found" });
+    }
+
+    const tx = transaction[0];
+
+    // Check if already processed
+    if (tx.status !== "pending") {
+      return res.status(400).json({ 
+        error: `Withdrawal request is already ${tx.status}`,
+        currentStatus: tx.status,
+      });
+    }
+
+    const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
+
+    // Verify user still has sufficient balance
+    const currentBalance = await getUserBalance(tx.user_id);
+    if (currentBalance < amount) {
+      return res.status(400).json({
+        error: "User has insufficient balance",
+        currentBalance,
+        requestedAmount: amount,
+      });
+    }
+
+    // Deduct balance
+    const newBalance = currentBalance - amount;
+    await updateUserBalance(tx.user_id, newBalance);
+
+    // Update transaction status
+    await query(
+      `UPDATE pix_transactions 
+       SET status = 'completed', balance_after = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [newBalance, transactionId],
+    );
+
+    logger.info(
+      `Withdrawal approved by admin ${req.userId}: transactionId=${transactionId}, userId=${tx.user_id}, amount=${amount}, newBalance=${newBalance}`,
+    );
+
+    res.json({
+      message: "Withdrawal approved successfully",
+      transactionId: tx.id,
+      amount,
+      newBalance,
+      pixKey: tx.pix_key,
+    });
+  } catch (error) {
+    logger.error(error, "Error approving withdrawal");
+    res.status(500).json({ error: "Failed to approve withdrawal" });
+  }
+});
+
+// Reject withdrawal request
+router.post("/withdrawals/reject", async (req: AuthRequest, res) => {
+  try {
+    const { transactionId, reason } = req.body;
+
+    if (!transactionId) {
+      return res.status(400).json({ error: "Transaction ID is required" });
+    }
+
+    // Get transaction details
+    const transaction = (await query(
+      `SELECT id, user_id, amount, status
+       FROM pix_transactions 
+       WHERE id = ? AND transaction_type = 'withdrawal'`,
+      [transactionId],
+    )) as Array<{
+      id: string;
+      user_id: string;
+      amount: number | string;
+      status: string;
+    }>;
+
+    if (transaction.length === 0) {
+      return res.status(404).json({ error: "Withdrawal request not found" });
+    }
+
+    const tx = transaction[0];
+
+    // Check if already processed
+    if (tx.status !== "pending") {
+      return res.status(400).json({ 
+        error: `Withdrawal request is already ${tx.status}`,
+        currentStatus: tx.status,
+      });
+    }
+
+    // Update transaction status to failed
+    await query(
+      `UPDATE pix_transactions 
+       SET status = 'failed', error_message = ?, updated_at = NOW()
+       WHERE id = ?`,
+      [reason || "Rejected by admin", transactionId],
+    );
+
+    logger.info(
+      `Withdrawal rejected by admin ${req.userId}: transactionId=${transactionId}, userId=${tx.user_id}, reason=${reason || "No reason provided"}`,
+    );
+
+    res.json({
+      message: "Withdrawal rejected successfully",
+      transactionId: tx.id,
+    });
+  } catch (error) {
+    logger.error(error, "Error rejecting withdrawal");
+    res.status(500).json({ error: "Failed to reject withdrawal" });
   }
 });
 

@@ -26,7 +26,6 @@ interface GameRoomProps {
   isConnected: boolean;
   onSendMessage: (message: string) => void;
   onStartVideo: () => void;
-  onEndCall: () => void;
   onRematch: () => void;
   onExitRoom: () => void;
   onLogout?: () => void;
@@ -40,7 +39,6 @@ export default function GameRoom({
   isConnected,
   onSendMessage,
   onStartVideo,
-  onEndCall,
   onRematch,
   onExitRoom,
   onLogout,
@@ -683,7 +681,6 @@ export default function GameRoom({
               <div className="flex-1 min-h-0">
                 <VideoPanel 
                   onStartVideo={onStartVideo} 
-                  onEndCall={onEndCall} 
                   players={players} 
                   currentUserId={userId}
                   roomId={roomId || localRoomId}

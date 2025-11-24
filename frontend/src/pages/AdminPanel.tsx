@@ -52,14 +52,31 @@ interface Stats {
   };
 }
 
+interface Withdrawal {
+  id: string;
+  userId: string;
+  username: string;
+  amount: number;
+  status: string;
+  pixKey: string | null;
+  balanceBefore: number | null;
+  balanceAfter: number | null;
+  currentBalance: number;
+  errorMessage: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function AdminPanel() {
   const { t } = useTranslation();
   const { showNotification } = useNotification();
   const { showConfirm, showPrompt, DialogComponent } = useDialog();
   const [users, setUsers] = useState<User[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [activeTab, setActiveTab] = useState<'users' | 'reports' | 'stats'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'reports' | 'stats' | 'withdrawals'>('users');
+  const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState<'pending' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -77,9 +94,11 @@ export default function AdminPanel() {
         fetchUsers();
       } else if (activeTab === 'reports') {
         fetchReports();
+      } else if (activeTab === 'withdrawals') {
+        fetchWithdrawals();
       }
     }
-  }, [userId, activeTab, currentPage, searchQuery]);
+  }, [userId, activeTab, currentPage, searchQuery, withdrawalStatusFilter]);
 
   const fetchUsers = async () => {
     const { authenticatedFetch } = await import('../utils/api');
@@ -302,6 +321,114 @@ export default function AdminPanel() {
     }
   };
 
+  const fetchWithdrawals = async () => {
+    const { authenticatedFetch } = await import('../utils/api');
+    if (!userId) return;
+    setLoading(true);
+    try {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.WITHDRAWALS, {
+        method: 'POST',
+        body: JSON.stringify({
+          page: currentPage,
+          limit: 20,
+          status: withdrawalStatusFilter,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setWithdrawals(data.withdrawals || []);
+        setTotalPages(data.pagination?.totalPages || 1);
+      } else {
+        const error = await response.json();
+        if (error.error === 'Admin access required') {
+          showNotification(t('admin.adminAccessRequired'), 'error');
+          window.location.href = '/';
+        } else {
+          showNotification(error.error || t('admin.errorFetchingWithdrawals'), 'error');
+        }
+      }
+    } catch (error) {
+      showNotification(t('admin.errorFetchingWithdrawals'), 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveWithdrawal = async (transactionId: string, username: string, amount: number) => {
+    const { authenticatedFetch } = await import('../utils/api');
+    if (!userId) return;
+    
+    const confirmed = await showConfirm(
+      t('admin.approveWithdrawalConfirm', { username, amount: amount.toFixed(2) }),
+      {
+        title: t('admin.approveWithdrawal'),
+        type: 'info',
+        confirmText: t('admin.approve'),
+        cancelText: t('common.cancel'),
+      }
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.APPROVE_WITHDRAWAL, {
+        method: 'POST',
+        body: JSON.stringify({
+          transactionId,
+        }),
+      });
+
+      if (response.ok) {
+        showNotification(t('admin.withdrawalApprovedSuccess', { username }), 'success');
+        fetchWithdrawals();
+        fetchUsers();
+        fetchStats();
+      } else {
+        const error = await response.json();
+        showNotification(error.error || t('admin.failedToApproveWithdrawal'), 'error');
+      }
+    } catch (error) {
+      showNotification(t('admin.errorApprovingWithdrawal'), 'error');
+    }
+  };
+
+  const handleRejectWithdrawal = async (transactionId: string, username: string) => {
+    const { authenticatedFetch } = await import('../utils/api');
+    if (!userId) return;
+    
+    const reason = await showPrompt(t('admin.enterRejectionReason', { username }), {
+      title: t('admin.rejectWithdrawal'),
+      type: 'warning',
+      placeholder: t('admin.rejectionReasonPlaceholder'),
+      confirmText: t('admin.reject'),
+      cancelText: t('common.cancel'),
+    });
+    
+    if (!reason) return;
+
+    try {
+      const response = await authenticatedFetch(API_ENDPOINTS.ADMIN.REJECT_WITHDRAWAL, {
+        method: 'POST',
+        body: JSON.stringify({
+          transactionId,
+          reason,
+        }),
+      });
+
+      if (response.ok) {
+        showNotification(t('admin.withdrawalRejectedSuccess', { username }), 'success');
+        fetchWithdrawals();
+        fetchStats();
+      } else {
+        const error = await response.json();
+        showNotification(error.error || t('admin.failedToRejectWithdrawal'), 'error');
+      }
+    } catch (error) {
+      showNotification(t('admin.errorRejectingWithdrawal'), 'error');
+    }
+  };
+
   return (
     <>
       {DialogComponent}
@@ -450,6 +577,20 @@ export default function AdminPanel() {
             >
               <TrendingUp className="w-5 h-5 inline mr-2" />
               {t('admin.statistics')}
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('withdrawals');
+                setCurrentPage(1);
+              }}
+              className={`flex-1 px-6 py-4 font-semibold transition-colors ${
+                activeTab === 'withdrawals'
+                  ? 'text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <DollarSign className="w-5 h-5 inline mr-2" />
+              {t('admin.withdrawals')}
             </button>
           </div>
 
@@ -649,6 +790,153 @@ export default function AdminPanel() {
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+          )}
+
+          {/* Withdrawals Tab */}
+          {activeTab === 'withdrawals' && (
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">{t('admin.withdrawalRequests')}</h3>
+                <div className="flex items-center gap-4">
+                  <select
+                    value={withdrawalStatusFilter}
+                    onChange={(e) => {
+                      setWithdrawalStatusFilter(e.target.value as 'pending' | 'all');
+                      setCurrentPage(1);
+                    }}
+                    className="px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="pending">{t('admin.pending')}</option>
+                    <option value="all">{t('admin.all')}</option>
+                  </select>
+                  <button
+                    onClick={fetchWithdrawals}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    {t('admin.refresh')}
+                  </button>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="text-center py-8">
+                  <div className="inline-block w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : withdrawals.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <DollarSign className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+                  <p>{t('admin.noWithdrawalsFound')}</p>
+                </div>
+              ) : (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.username')}</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.amount')}</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.pixKey')}</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.currentBalance')}</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.status')}</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.createdAt')}</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">{t('admin.actions')}</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {withdrawals.map((withdrawal) => (
+                          <tr key={withdrawal.id} className="hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-medium text-gray-900">{withdrawal.username}</p>
+                                <p className="text-xs text-gray-500">{withdrawal.userId.substring(0, 8)}...</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-red-600">
+                                R$ {withdrawal.amount.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="text-sm text-gray-900 font-mono">{withdrawal.pixKey || '-'}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="font-semibold text-green-600">
+                                R$ {withdrawal.currentBalance.toFixed(2)}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                withdrawal.status === 'pending'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : withdrawal.status === 'completed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                              }`}>
+                                {withdrawal.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="text-xs text-gray-600">
+                                {new Date(withdrawal.createdAt).toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                {withdrawal.status === 'pending' && (
+                                  <>
+                                    <button
+                                      onClick={() => handleApproveWithdrawal(withdrawal.id, withdrawal.username, withdrawal.amount)}
+                                      className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition-colors flex items-center gap-1"
+                                    >
+                                      <CheckCircle className="w-3 h-3" />
+                                      {t('admin.approve')}
+                                    </button>
+                                    <button
+                                      onClick={() => handleRejectWithdrawal(withdrawal.id, withdrawal.username)}
+                                      className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors flex items-center gap-1"
+                                    >
+                                      <Ban className="w-3 h-3" />
+                                      {t('admin.reject')}
+                                    </button>
+                                  </>
+                                )}
+                                {withdrawal.status === 'failed' && withdrawal.errorMessage && (
+                                  <span className="text-xs text-red-600" title={withdrawal.errorMessage}>
+                                    {withdrawal.errorMessage.substring(0, 30)}...
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between mt-4">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {t('admin.previous')}
+                      </button>
+                      <span className="text-sm text-gray-600">
+                        {t('admin.page')} {currentPage} {t('admin.of')} {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {t('admin.next')}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

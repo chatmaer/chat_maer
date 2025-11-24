@@ -90,6 +90,9 @@ export const API_ENDPOINTS = {
     BAN_USER: getApiUrl('api/admin/users/ban'),
     UNBAN_USER: getApiUrl('api/admin/users/unban'),
     UPDATE_BALANCE: getApiUrl('api/admin/users/balance'),
+    WITHDRAWALS: getApiUrl('api/admin/withdrawals'),
+    APPROVE_WITHDRAWAL: getApiUrl('api/admin/withdrawals/approve'),
+    REJECT_WITHDRAWAL: getApiUrl('api/admin/withdrawals/reject'),
   },
 } as const;
 
