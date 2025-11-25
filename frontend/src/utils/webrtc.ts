@@ -285,8 +285,13 @@ export class RTCManager extends EventEmitter {
     this.pc.addEventListener('track', (event) => {
       const [stream] = event.streams;
       if (stream) {
-        this.remoteStream = stream;
-        this.emit('track', stream);
+        // Only set remote stream if it's actually a remote track
+        // Check that the track is not from our local stream
+        const track = event.track;
+        if (track && track.readyState === 'live') {
+          this.remoteStream = stream;
+          this.emit('track', stream);
+        }
       }
     });
 

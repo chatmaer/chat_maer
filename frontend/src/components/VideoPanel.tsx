@@ -33,6 +33,57 @@ export default function VideoPanel({
   // Create stable key from players (only changes when player IDs change, not array reference)
   const playersKey = players?.map(p => p.id).sort().join(',') || '';
 
+  // Helper function to set up track handlers (ensures they're always set up)
+  const setupTrackHandlers = (rtcManager: RTCManager) => {
+    // Remove any existing track listeners to avoid duplicates
+    rtcManager.removeAllListeners('track');
+    rtcManager.removeAllListeners('icecandidate');
+    
+    const socket = socketRef.current;
+    
+    // Handle remote track - ensure it only goes to remote video element
+    rtcManager.on('track', (remoteStream: MediaStream) => {
+      console.log('Remote track received:', remoteStream);
+      if (remoteVideoRef.current && remoteStream) {
+        // Ensure we're not accidentally assigning local stream
+        const localStream = getLocalStream();
+        const isLocalStream = localStream && (
+          remoteStream === localStream || 
+          remoteStream.id === localStream.id ||
+          // Check track IDs to be extra sure
+          (remoteStream.getVideoTracks().length > 0 && 
+           localStream.getVideoTracks().length > 0 &&
+           remoteStream.getVideoTracks()[0].id === localStream.getVideoTracks()[0].id)
+        );
+        
+        if (!isLocalStream) {
+          // Ensure local video element doesn't have this stream
+          if (localVideoRef.current && localVideoRef.current.srcObject === remoteStream) {
+            console.warn('Preventing local video from showing remote stream');
+            localVideoRef.current.srcObject = null;
+          }
+          
+          remoteVideoRef.current.srcObject = remoteStream;
+          setHasRemoteVideo(true);
+          remoteVideoRef.current.play().catch((err) => {
+            console.error('Error playing remote video:', err);
+          });
+        } else {
+          console.warn('Received local stream as remote stream, ignoring');
+        }
+      }
+    });
+
+    // Handle ICE candidates
+    if (socket) {
+      rtcManager.on('icecandidate', (candidate: RTCIceCandidate) => {
+        socket.emit('webrtc_ice_candidate', {
+          candidate: candidate.toJSON(),
+        });
+      });
+    }
+  };
+
   // Initialize WebRTC connection when both players are present
   useEffect(() => {
     // Update ref with current players
@@ -60,27 +111,17 @@ export default function VideoPanel({
           // Create new peer connection
           rtcManagerRef.current = new RTCManager();
           
+          // Set up track handlers immediately
+          setupTrackHandlers(rtcManagerRef.current);
+          
           if (localStream) {
             rtcManagerRef.current.addTracks(localStream);
           }
-
-          // Handle remote track
-          rtcManagerRef.current.on('track', (stream: MediaStream) => {
-            if (remoteVideoRef.current) {
-              remoteVideoRef.current.srcObject = stream;
-              setHasRemoteVideo(true);
-              remoteVideoRef.current.play().catch(console.error);
-            }
-          });
-
-          // Handle ICE candidates
-          rtcManagerRef.current.on('icecandidate', (candidate: RTCIceCandidate) => {
-            socket.emit('webrtc_ice_candidate', {
-              candidate: candidate.toJSON(),
-            });
-          });
         } else {
-          // Peer connection exists - update tracks if needed (for renegotiation)
+          // Peer connection exists - ensure track handlers are set up
+          setupTrackHandlers(rtcManagerRef.current);
+          
+          // Update tracks if needed (for renegotiation)
           if (localStream) {
             rtcManagerRef.current.replaceTracks(localStream);
           }
@@ -136,21 +177,29 @@ export default function VideoPanel({
     };
   }, [roomId, playersKey, currentUserId]); // Use stable key instead of players array reference
 
-  // Update local video when stream is available
+  // Update local video when stream is available - ensure it only shows local stream
   useEffect(() => {
     const updateLocalVideo = async () => {
       const localStream = getLocalStream();
       if (localVideoRef.current && localStream) {
-        // Only update if srcObject is different
-        if (localVideoRef.current.srcObject !== localStream) {
-          localVideoRef.current.srcObject = localStream;
-          // Ensure video plays after setting stream
-          try {
-            await localVideoRef.current.play();
-          } catch (error) {
-            console.error('Error playing local video:', error);
+        // Only update if srcObject is different and ensure it's the local stream
+        const currentSrcObject = localVideoRef.current.srcObject as MediaStream | null;
+        if (currentSrcObject !== localStream && currentSrcObject?.id !== localStream.id) {
+          // Double-check: ensure we're not accidentally assigning remote stream
+          const remoteStream = rtcManagerRef.current?.getRemoteStream();
+          if (localStream !== remoteStream && localStream.id !== remoteStream?.id) {
+            localVideoRef.current.srcObject = localStream;
+            // Ensure video plays after setting stream
+            try {
+              await localVideoRef.current.play();
+            } catch (error) {
+              console.error('Error playing local video:', error);
+            }
           }
         }
+      } else if (localVideoRef.current && !localStream) {
+        // Clear local video if stream is not available
+        localVideoRef.current.srcObject = null;
       }
     };
 
@@ -172,6 +221,9 @@ export default function VideoPanel({
       }
       if (remoteVideoRef.current) {
         remoteVideoRef.current.srcObject = null;
+      }
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
       }
       setHasRemoteVideo(false);
     };
@@ -230,25 +282,13 @@ export default function VideoPanel({
               // Create new peer connection
               setIsConnecting(true);
               rtcManagerRef.current = new RTCManager();
+              
+              // Set up track handlers immediately
+              setupTrackHandlers(rtcManagerRef.current);
+              
               if (localStream) {
                 rtcManagerRef.current.addTracks(localStream);
               }
-
-              // Handle remote track
-              rtcManagerRef.current.on('track', (remoteStream: MediaStream) => {
-                if (remoteVideoRef.current) {
-                  remoteVideoRef.current.srcObject = remoteStream;
-                  setHasRemoteVideo(true);
-                  remoteVideoRef.current.play().catch(console.error);
-                }
-              });
-
-              // Handle ICE candidates
-              rtcManagerRef.current.on('icecandidate', (candidate: RTCIceCandidate) => {
-                socket.emit('webrtc_ice_candidate', {
-                  candidate: candidate.toJSON(),
-                });
-              });
 
               // Create and send offer
               try {
@@ -260,7 +300,10 @@ export default function VideoPanel({
                 showNotification('Failed to establish video connection', 'error');
               }
             } else {
-              // Peer connection already exists - update tracks and renegotiate
+              // Peer connection already exists - ensure track handlers are set up
+              setupTrackHandlers(rtcManagerRef.current);
+              
+              // Update tracks and renegotiate
               if (localStream) {
                 try {
                   setIsConnecting(true);
