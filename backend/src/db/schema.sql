@@ -179,3 +179,23 @@ CREATE TABLE IF NOT EXISTS pix_transactions (
     INDEX idx_pix_transaction_id (pix_transaction_id)
 );
 
+-- Platform updates table (tracks platform boosts/updates - separate from balance)
+CREATE TABLE IF NOT EXISTS platform_updates (
+    id VARCHAR(36) PRIMARY KEY,
+    user_id VARCHAR(36) NOT NULL,
+    amount DECIMAL(10, 2) NOT NULL DEFAULT 1.00 COMMENT 'Update amount (always 1 R$)',
+    status ENUM('pending', 'processing', 'completed', 'failed', 'cancelled') DEFAULT 'pending',
+    pix_transaction_id VARCHAR(255) NULL COMMENT 'External Pix transaction ID from provider',
+    qr_code TEXT NULL COMMENT 'QR code data for payment',
+    qr_code_base64 TEXT NULL COMMENT 'QR code base64 image',
+    qr_code_expires_at DATETIME NULL COMMENT 'QR code expiration time',
+    error_message TEXT NULL COMMENT 'Error message if transaction failed',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_status (status),
+    INDEX idx_created_at (created_at),
+    INDEX idx_pix_transaction_id (pix_transaction_id)
+);
+

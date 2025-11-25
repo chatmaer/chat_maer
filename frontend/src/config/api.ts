@@ -81,6 +81,9 @@ export const API_ENDPOINTS = {
     WITHDRAWAL_REQUEST: getApiUrl('api/pix/withdrawal/request'),
     WITHDRAWAL_STATUS: (transactionId: string) => getApiUrl(`api/pix/withdrawal/status/${transactionId}`),
     BALANCE: getApiUrl('api/pix/balance'),
+    PLATFORM_UPDATE_REQUEST: getApiUrl('api/pix/platform-update/request'),
+    PLATFORM_UPDATE_STATUS: (transactionId: string) => getApiUrl(`api/pix/platform-update/status/${transactionId}`),
+    PLATFORM_UPDATE_COUNT: getApiUrl('api/pix/platform-update/count'),
   },
   // Admin endpoints
   ADMIN: {

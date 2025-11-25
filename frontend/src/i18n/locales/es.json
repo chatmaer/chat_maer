@@ -253,7 +253,14 @@
   "header": {
     "wallet": "Billetera",
     "logoutConfirm": "¿Estás seguro de que deseas cerrar sesión?",
-    "logoutTitle": "Cerrar Sesión"
+    "logoutTitle": "Cerrar Sesión",
+    "updatePlatform": "Actualizar esta plataforma",
+    "updateDescription": "Apoya la plataforma depositando 1 R$ vía Pix",
+    "updateAmount": "Cantidad: R$ 1,00",
+    "updateLoginRequired": "Por favor, inicia sesión para actualizar la plataforma",
+    "updateFailed": "Error al procesar el pago de actualización",
+    "updateQrCodeGenerated": "Código QR generado. Por favor, escanéalo para completar el pago.",
+    "updateCompleted": "¡Gracias por apoyar la plataforma!"
   },
   "dialog": {
     "alert": "Alerta",

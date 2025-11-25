@@ -816,7 +816,65 @@ router.post("/webhook", async (req, res) => {
     if (type === "payment" && data?.id) {
       const paymentId = String(data.id);
 
-      // Find the transaction by Mercado Pago payment ID
+      // First, check for platform updates
+      const platformUpdates = (await query(
+        `SELECT id, user_id, amount, status FROM platform_updates 
+         WHERE pix_transaction_id = ?`,
+        [paymentId],
+      )) as Array<{
+        id: string;
+        user_id: string;
+        amount: number | string;
+        status: string;
+      }>;
+
+      if (platformUpdates.length > 0) {
+        const tx = platformUpdates[0];
+
+        // Fetch current payment status from Mercado Pago
+        if (mercadopagoClient) {
+          try {
+            const { candidate } = await getPaymentStatusFromMercadoPago(paymentId);
+            const payment = candidate;
+            const mpStatus = payment?.status ?? null;
+
+            if (mpStatus === "approved" && (tx.status === "pending" || tx.status === "processing")) {
+              await query(
+                `UPDATE platform_updates 
+                 SET status = 'completed', updated_at = NOW() 
+                 WHERE id = ?`,
+                [tx.id],
+              );
+
+              logger.info(`Platform update completed via webhook: userId=${tx.user_id}, amount=${tx.amount}`);
+            } else if (mpStatus === "rejected" || mpStatus === "cancelled") {
+              if (tx.status === "pending" || tx.status === "processing") {
+                await query(
+                  `UPDATE platform_updates 
+                   SET status = 'failed', error_message = ?, updated_at = NOW() 
+                   WHERE id = ?`,
+                  [payment?.status_detail ?? mpStatus, tx.id],
+                );
+                logger.info(`Platform update failed via webhook: transactionId=${tx.id}, status=${mpStatus}`);
+              }
+            } else if (mpStatus === "pending" || mpStatus === "in_process") {
+              if (tx.status === "pending") {
+                await query(
+                  `UPDATE platform_updates 
+                   SET status = 'processing', updated_at = NOW() 
+                   WHERE id = ?`,
+                  [tx.id],
+                );
+              }
+            }
+          } catch (mpErr: any) {
+            logger.error({ err: mpErr.message }, "Error processing webhook platform update status");
+          }
+        }
+        return; // Platform update processed, don't check deposits
+      }
+
+      // Then check for regular deposits
       const transactions = (await query(
         `SELECT id, user_id, amount, status FROM pix_transactions 
          WHERE pix_transaction_id = ? AND transaction_type = 'deposit'`,
@@ -888,6 +946,265 @@ router.post("/webhook", async (req, res) => {
     logger.error({ err: error.message }, "Error processing Mercado Pago webhook");
     // Still return 200 to prevent Mercado Pago from retrying
     res.status(200).json({ received: true, error: "Processing failed but acknowledged" });
+  }
+});
+
+// Platform update (boost) - separate from balance deposits
+router.post("/platform-update/request", async (req: AuthRequest, res) => {
+  try {
+    if (!config.mercadoPago.accessToken) {
+      return res.status(503).json({
+        error: "Pix integration is not configured",
+        enabled: false,
+      });
+    }
+
+    if (!mercadopagoClient) {
+      logger.error("Mercado Pago SDK is not available. Please install: npm install mercadopago");
+      return res.status(503).json({
+        error: "Pix integration is not available. Mercado Pago SDK not installed.",
+        enabled: false,
+      });
+    }
+
+    const { payer } = req.body;
+    const userId = req.userId;
+    const amount = 1.00; // Fixed amount for platform updates
+
+    if (!userId || !amount) {
+      return res.status(400).json({ error: "userId and amount are required" });
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ error: "Amount must be greater than 0" });
+    }
+
+    if (amount < 1) {
+      return res.status(400).json({ error: "Minimum update is R$ 1.00" });
+    }
+
+    // Validate payer information
+    if (!payer || !payer.email || !payer.firstName || !payer.lastName) {
+      return res.status(400).json({
+        error: "Payer information is required (email, firstName, lastName)",
+      });
+    }
+
+    if (!payer.identification || !payer.identification.type || !payer.identification.number) {
+      return res.status(400).json({
+        error: "Payer identification is required (type: CPF or CNPJ, number)",
+      });
+    }
+
+    // Check if user exists
+    const user = (await query("SELECT id, username FROM users WHERE id = ?", [
+      userId,
+    ])) as Array<{ id: string; username: string }>;
+
+    if (user.length === 0) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const transactionId = uuidv4();
+
+    // Create payment data for Mercado Pago
+    const paymentData = {
+      payment_method_id: "pix",
+      description: `Platform update from user ${user[0].username}`,
+      transaction_amount: Number(amount),
+      payer: {
+        email: payer.email,
+        first_name: payer.firstName,
+        last_name: payer.lastName,
+        identification: {
+          type: payer.identification.type, // CPF or CNPJ
+          number: payer.identification.number,
+        },
+      },
+      external_reference: transactionId,
+    };
+
+    // Create payment and normalize
+    const { normalized, diagnostics } = await createPaymentWithMercadoPago(paymentData).catch((e) => { throw e; });
+
+    const payment = normalized.raw;
+    const paymentId = normalized.id ?? (payment?.id ?? null);
+    const status = normalized.status ?? payment?.status ?? null;
+    const poi = normalized.point_of_interaction ?? payment?.point_of_interaction ?? null;
+
+    // Attempt to read QR info
+    const qrCode = poi?.transaction_data?.qr_code ?? null;
+    const qrCodeBase64 = poi?.transaction_data?.qr_code_base64 ?? null;
+
+    if (!qrCode || !qrCodeBase64) {
+      logger.error({ normalized, diagnostics, payment }, "Payment created but QR code not found");
+      return res.status(500).json({ error: "Failed to generate QR code", details: "qr_code missing from response" });
+    }
+
+    // Calculate expiration time (Mercado Pago Pix QR codes typically expire in 30 minutes)
+    const expiresAtDate = new Date(Date.now() + 30 * 60 * 1000);
+    const expiresAt = expiresAtDate.toISOString().slice(0, 19).replace('T', ' ');
+
+    // Save to platform_updates table (not pix_transactions)
+    // Store QR code data as JSON string (similar to pix_transactions)
+    const qrCodeData = { qrCode, qrCodeBase64, transactionId, expiresAt, mercadoPagoPaymentId: String(paymentId) };
+    
+    await query(
+      `INSERT INTO platform_updates 
+       (id, user_id, amount, status, qr_code, qr_code_base64, qr_code_expires_at, pix_transaction_id)
+       VALUES (?, ?, ?, 'pending', ?, ?, ?, ?)`,
+      [
+        transactionId,
+        userId,
+        amount,
+        JSON.stringify(qrCodeData),
+        qrCodeBase64,
+        expiresAt,
+        String(paymentId),
+      ],
+    );
+
+    logger.info(`Platform update request created: userId=${userId}, amount=${amount}, paymentId=${paymentId}`);
+
+    res.json({
+      transactionId,
+      qrCode,
+      qrCodeBase64: `data:image/jpeg;base64,${qrCodeBase64}`,
+      expiresAt,
+      amount,
+      paymentId,
+      status,
+      message: "Platform update request created. Scan QR code to complete payment.",
+    });
+  } catch (error: any) {
+    logger.error({ err: error.message, cause: error.cause ?? null }, "Error in platform update request");
+    res.status(500).json({ error: error.message || "Failed to create platform update request" });
+  }
+});
+
+// Check platform update status
+router.get("/platform-update/status/:transactionId", async (req: AuthRequest, res) => {
+  try {
+    if (!config.mercadoPago.accessToken) {
+      return res.status(503).json({
+        error: "Pix integration is not configured",
+        enabled: false,
+      });
+    }
+
+    const { transactionId } = req.params;
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: "userId is required" });
+    }
+
+    // Get transaction from database
+    const transaction = (await query(
+      `SELECT id, user_id, amount, status, error_message, created_at, updated_at, pix_transaction_id
+       FROM platform_updates 
+       WHERE id = ? AND user_id = ?`,
+      [transactionId, userId],
+    )) as Array<{
+      id: string;
+      user_id: string;
+      amount: number | string;
+      status: string;
+      error_message: string | null;
+      created_at: Date;
+      updated_at: Date;
+      pix_transaction_id: string | null;
+    }>;
+
+    if (transaction.length === 0) {
+      return res.status(404).json({ error: "Transaction not found" });
+    }
+
+    const tx = transaction[0];
+    const mercadoPagoPaymentId = tx.pix_transaction_id;
+
+    // If we have a Mercado Pago payment id, attempt to fetch current payment info
+    if (tx.pix_transaction_id && mercadopagoClient) {
+      try {
+        const { candidate } = await getPaymentStatusFromMercadoPago(tx.pix_transaction_id);
+        const payment = candidate;
+        const mpStatus = payment?.status ?? null;
+
+        let newStatus = tx.status;
+        const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
+        if (mpStatus === "approved") {
+          newStatus = "completed";
+          if (tx.status === "pending" || tx.status === "processing") {
+            await query(`UPDATE platform_updates SET status = 'completed', updated_at = NOW() WHERE id = ?`, [transactionId]);
+            logger.info(`Platform update completed: userId=${userId}, amount=${amount}`);
+          }
+        } else if (mpStatus === "rejected" || mpStatus === "cancelled") {
+          newStatus = "failed";
+          if (tx.status === "pending" || tx.status === "processing") {
+            await query(`UPDATE platform_updates SET status = 'failed', error_message = ?, updated_at = NOW() WHERE id = ?`, [payment?.status_detail ?? mpStatus, transactionId]);
+          }
+        } else if (mpStatus === "pending" || mpStatus === "in_process") {
+          newStatus = "processing";
+          if (tx.status === "pending") {
+            await query(`UPDATE platform_updates SET status = 'processing', updated_at = NOW() WHERE id = ?`, [transactionId]);
+          }
+        }
+
+        return res.json({
+          transactionId: tx.id,
+          amount,
+          status: newStatus,
+          errorMessage: tx.error_message,
+          createdAt: tx.created_at,
+          updatedAt: tx.updated_at,
+          mercadoPagoStatus: mpStatus,
+        });
+      } catch (mpErr: any) {
+        logger.error(mpErr, "Error checking Mercado Pago payment status, returning DB status");
+        // fallthrough and return DB status
+      }
+    }
+
+    // Fallback: return DB status
+    const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount || 0);
+    res.json({
+      transactionId: tx.id,
+      amount,
+      status: tx.status,
+      errorMessage: tx.error_message,
+      createdAt: tx.created_at,
+      updatedAt: tx.updated_at,
+    });
+  } catch (error) {
+    logger.error(error, "Error checking platform update status");
+    res.status(500).json({ error: "Failed to check update status" });
+  }
+});
+
+// Get user's platform update count
+router.get("/platform-update/count", async (req: AuthRequest, res) => {
+  try {
+    const userId = req.userId;
+
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    const result = (await query(
+      `SELECT COUNT(*) as update_count 
+       FROM platform_updates 
+       WHERE user_id = ? AND status = 'completed'`,
+      [userId],
+    )) as Array<{ update_count: number | string }>;
+
+    const count = typeof result[0].update_count === 'number' 
+      ? result[0].update_count 
+      : Number(result[0].update_count || 0);
+
+    res.json({ count });
+  } catch (error) {
+    logger.error(error, "Error fetching platform update count");
+    res.status(500).json({ error: "Failed to fetch update count" });
   }
 });
 

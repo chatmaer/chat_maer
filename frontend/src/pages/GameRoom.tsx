@@ -6,7 +6,6 @@ import GameBoard from '../components/GameBoard';
 import GameInfoPanel from '../components/GameInfoPanel';
 import ChatPanel from '../components/ChatPanel';
 import VideoPanel from '../components/VideoPanel';
-import BettingPanel from '../components/BettingPanel';
 import { getSocket } from '../utils/socket';
 import { useNotification } from '../contexts/NotificationContext';
 
@@ -403,7 +402,6 @@ export default function GameRoom({
         setGameState(data.gameState);
         setGameOver(false);
         setIsWaiting(false);
-        // Betting info will be updated by BettingPanel component via socket events
       }
     };
 
@@ -639,14 +637,6 @@ export default function GameRoom({
               </div>
             )}
 
-            {/* Betting Panel moved below game board */}
-            {players.length > 0 && (
-              <BettingPanel
-                roomId={roomId || localRoomId}
-                userId={userId}
-                players={players}
-              />
-            )}
 
             <div className="flex gap-4">
               <button

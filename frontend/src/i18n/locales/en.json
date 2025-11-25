@@ -253,7 +253,15 @@
   "header": {
     "wallet": "Wallet",
     "logoutConfirm": "Are you sure you want to logout?",
-    "logoutTitle": "Logout"
+    "logoutTitle": "Logout",
+    "updatePlatform": "Update this platform",
+    "updateDescription": "Support the platform by depositing 1 R$ via Pix",
+    "updateAmount": "Amount: R$ 1.00",
+    "updateLoginRequired": "Please login to update the platform",
+    "updateFailed": "Failed to process update payment",
+    "updateQrCodeGenerated": "QR code generated. Please scan to complete payment.",
+    "updateCompleted": "Thank you for supporting the platform!",
+    "generateQrCode": "Generate QR Code"
   },
   "dialog": {
     "alert": "Alert",
