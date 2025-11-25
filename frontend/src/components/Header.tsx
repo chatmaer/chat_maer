@@ -203,7 +203,16 @@ export default function Header({ username, isConnected, onLogout, userId, onNavi
 
   return (
     <>
-    <header className="bg-white/90 backdrop-blur-sm shadow-sm sticky top-0 z-50">
+    {/* Fixed donation message banner */}
+    {displayUsername !== t('common.guest') && currentUserId && (
+      <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white py-2.5 px-4 sticky top-0 z-40 shadow-md animate-pulse">
+        <div className="max-w-7xl mx-auto flex items-center justify-center gap-2 text-sm font-medium">
+          <Sparkles className="w-4 h-4" />
+          <span>{t('header.updateDonationMessage')}</span>
+        </div>
+      </div>
+    )}
+    <header className={`bg-white/90 backdrop-blur-sm shadow-sm sticky z-50 ${displayUsername !== t('common.guest') && currentUserId ? 'top-[2.5rem]' : 'top-0'}`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -220,12 +229,12 @@ export default function Header({ username, isConnected, onLogout, userId, onNavi
               <button
                 onClick={handleUpdatePlatform}
                 disabled={isUpdating}
-                className="relative flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group"
-                title={t('header.updatePlatform')}
+                className="relative flex items-center gap-2 px-4 py-2 text-sm font-bold text-white bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 rounded-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group animate-pulse"
+                title={t('header.updateButton')}
               >
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 animate-pulse" />
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <Sparkles className="w-4 h-4 relative z-10 drop-shadow-lg" />
-                <span className="relative z-10 drop-shadow-lg">{t('header.updatePlatform')}</span>
+                <span className="relative z-10 drop-shadow-lg">{t('header.updateButton')}</span>
                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
               </button>
             )}
