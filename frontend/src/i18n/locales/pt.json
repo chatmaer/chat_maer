@@ -305,7 +305,9 @@
     "insufficientBalanceGeneric": "O jogo não pode começar: saldo insuficiente. Por favor, carregue seu saldo para iniciar o jogo.",
     "insufficientBalance": "Saldo insuficiente",
     "rematchInsufficientBalanceSingle": "A revanche não pode começar: {{players}} não tem saldo suficiente (R$ {{amount}} necessário).",
-    "rematchInsufficientBalanceMultiple": "A revanche não pode começar: {{players}} não têm saldo suficiente (R$ {{amount}} necessário)."
+    "rematchInsufficientBalanceMultiple": "A revanche não pode começar: {{players}} não têm saldo suficiente (R$ {{amount}} necessário).",
+    "roomNotFound": "Sala não encontrada",
+    "notInRoom": "Você não está em uma sala"
   },
   "authCallback": {
     "title": "Escolha Seu Nome de Usuário",

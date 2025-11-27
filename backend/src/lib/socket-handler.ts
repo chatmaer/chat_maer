@@ -859,7 +859,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -872,7 +875,10 @@ export const setupSocketHandlers = (io: Server): void => {
           )) as Array<{ game_type: string }>;
           
           if (roomInfo.length === 0) {
-            socket.emit("error", { message: "Room not found" });
+            socket.emit("error", { 
+              message: "Room not found",
+              translationKey: "gameRoom.roomNotFound"
+            });
             return;
           }
           
@@ -932,7 +938,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -957,7 +966,10 @@ export const setupSocketHandlers = (io: Server): void => {
         )) as Array<{ status: string }>;
         
         if (roomInfo.length === 0) {
-          socket.emit("error", { message: "Room not found" });
+          socket.emit("error", { 
+            message: "Room not found",
+            translationKey: "gameRoom.roomNotFound"
+          });
           return;
         }
         
@@ -1234,7 +1246,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1422,7 +1437,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1467,7 +1485,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1562,7 +1583,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1678,7 +1702,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1713,7 +1740,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1797,7 +1827,10 @@ export const setupSocketHandlers = (io: Server): void => {
 
         const roomId = data.roomId || userRooms.get(socketWithUserId.userId);
         if (!roomId) {
-          socket.emit("error", { message: "Not in a room" });
+          socket.emit("error", { 
+            message: "Not in a room",
+            translationKey: "gameRoom.notInRoom"
+          });
           return;
         }
 
@@ -1808,18 +1841,176 @@ export const setupSocketHandlers = (io: Server): void => {
         )) as Array<{ game_type: string }>;
         
         if (roomInfo.length === 0) {
-          socket.emit("error", { message: "Room not found" });
+          socket.emit("error", { 
+            message: "Room not found",
+            translationKey: "gameRoom.roomNotFound"
+          });
           return;
         }
 
         const gameType = data.gameType || roomInfo[0].game_type;
 
+        // Check how many players are in the room
+        const players = await getRoomPlayers(roomId);
+        
+        // If only 1 player remains (opponent left), join matchmaking instead of rematch
+        if (players.length === 1) {
+          logger.info({ userId: socketWithUserId.userId, roomId, gameType }, "Only 1 player in room, joining matchmaking for rematch");
+          
+          // Leave current room
+          await removePlayerFromRoom(roomId, socketWithUserId.userId);
+          socket.leave(roomId);
+          userRooms.delete(socketWithUserId.userId);
+          rematchRequests.delete(roomId);
+          
+          // Clean up empty room
+          const remainingPlayers = await getRoomPlayers(roomId);
+          if (remainingPlayers.length === 0) {
+            removeGame(roomId);
+            await query("DELETE FROM rooms WHERE id = ?", [roomId]);
+          }
+          
+          // Join matchmaking queue for the same game type
+          // Reuse the join_random logic
+          const existingRoom = await getUserRoom(socketWithUserId.userId);
+          if (existingRoom) {
+            const stillInRoom = await checkPlayerInRoom(
+              existingRoom.id,
+              socketWithUserId.userId,
+            );
+            if (stillInRoom) {
+              await removePlayerFromRoom(existingRoom.id, socketWithUserId.userId);
+            }
+            socket.leave(existingRoom.id);
+            userRooms.delete(socketWithUserId.userId);
+          }
+
+          // Look for waiting room with available slot
+          let room = await findWaitingRoom(gameType);
+
+          if (!room) {
+            // Create new room
+            const newRoomId = await createRoom(gameType);
+            await addPlayerToRoom(newRoomId, socketWithUserId.userId, true);
+            room = { id: newRoomId, player_count: 1 };
+          } else {
+            // Join existing room
+            const currentPlayers = await getRoomPlayers(room.id);
+            if (currentPlayers.length >= 2) {
+              // Room already full, create new one
+              const newRoomId = await createRoom(gameType);
+              await addPlayerToRoom(newRoomId, socketWithUserId.userId, true);
+              room = { id: newRoomId, player_count: 1 };
+            } else {
+              const alreadyInRoom = await checkPlayerInRoom(
+                room.id,
+                socketWithUserId.userId,
+              );
+              if (!alreadyInRoom) {
+                await addPlayerToRoom(room.id, socketWithUserId.userId, false);
+              }
+            }
+          }
+
+          // Join socket room
+          socket.join(room.id);
+          userRooms.set(socketWithUserId.userId, room.id);
+
+          // Load and send chat history
+          const chatHistory = (await query(
+            "SELECT cm.id, cm.user_id, cm.message, cm.created_at, COALESCE(u.display_username, u.username) as username FROM chat_messages cm JOIN users u ON cm.user_id = u.id WHERE cm.room_id = ? ORDER BY cm.created_at ASC",
+            [room.id],
+          )) as Array<{
+            id: string;
+            user_id: string;
+            message: string;
+            created_at: Date;
+            username: string;
+          }>;
+
+          if (chatHistory.length > 0) {
+            socket.emit("chat_history", {
+              messages: chatHistory.map((msg) => ({
+                id: msg.id,
+                userId: msg.user_id,
+                username: msg.username,
+                message: msg.message,
+                timestamp: msg.created_at,
+              })),
+            });
+          }
+
+          const newPlayers = await getRoomPlayers(room.id);
+
+          // Initialize game immediately (even with 1 player) so board is visible
+          let game = getGame(room.id);
+          if (!game) {
+            game = initializeGame(gameType as GameType);
+            setGame(room.id, game);
+          }
+          const gameState = getGameState(game);
+
+          const bettingInfo = await getRoomBettingInfo(room.id);
+          const bettingAmount = bettingInfo?.betting_amount || 0.25;
+          
+          if (newPlayers.length === 2) {
+            // Games are now free to play - no balance check required
+            await updateRoomStatus(room.id, "playing");
+            // Use setTimeout to ensure socket room join is complete
+            setTimeout(() => {
+              io.to(room.id).emit("game_start", {
+                roomId: room.id,
+                gameType,
+                players: newPlayers,
+                gameState,
+                canMove: true, // Allow moves when 2 players are present
+                bettingAmount,
+                bettingStatus: bettingInfo?.betting_status || "unlocked",
+              });
+            }, 100);
+          } else {
+            // Send game state even with 1 player so board is visible
+            logger.info(`Sending game_start to single player in room ${room.id}, players: ${newPlayers.length}`);
+            socket.emit("game_start", {
+              roomId: room.id,
+              gameType,
+              players: newPlayers,
+              gameState,
+              canMove: false, // Disable moves until 2 players join
+              bettingAmount: bettingInfo?.betting_amount || 0.25,
+              bettingStatus: bettingInfo?.betting_status || "unlocked",
+            });
+            socket.emit("waiting_for_player", { 
+              roomId: room.id, 
+              players: newPlayers,
+              gameState 
+            });
+            // Only emit player_joined to other players in the room (if any)
+            if (newPlayers.length > 1) {
+              socket.to(room.id).emit("player_joined", {
+                roomId: room.id,
+                players: newPlayers,
+              });
+            }
+          }
+          
+          // Emit a special event to notify frontend that rematch resulted in new room
+          socket.emit("rematch_new_room", {
+            oldRoomId: roomId,
+            newRoomId: room.id,
+            players: newPlayers,
+            gameType
+          });
+          
+          return; // Exit early since we've handled the rematch as matchmaking
+        }
+
+        // Normal rematch flow when both players are present
         if (!rematchRequests.has(roomId)) {
           rematchRequests.set(roomId, new Set());
         }
         rematchRequests.get(roomId)!.add(socketWithUserId.userId);
 
-        const players = await getRoomPlayers(roomId);
         if (rematchRequests.get(roomId)!.size === players.length) {
           // Unlock betting for rematch so players can negotiate new amount
           await query(

@@ -209,28 +209,28 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
         <Header isConnected={isConnected} username={propUsername || username} onLogout={onLogout} userId={userId} onNavigate={onNavigate} />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="max-w-md mx-auto mt-20">
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              <h2 className="text-3xl font-bold text-gray-900 mb-4 text-center">
+        <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-8 sm:py-12">
+          <div className="max-w-md mx-auto mt-8 sm:mt-12 md:mt-20 px-2">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-6 sm:p-8">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-3 sm:mb-4 text-center">
                 {t('home.welcomeTitle')}
               </h2>
-              <p className="text-gray-600 mb-6 text-center">
+              <p className="text-gray-600 mb-4 sm:mb-6 text-center text-sm sm:text-base">
                 {t('home.enterUsername')}
               </p>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder={t('home.usernamePlaceholder')}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   onKeyPress={(e) => e.key === 'Enter' && handleSetUsername()}
                 />
                 <button
                   onClick={handleSetUsername}
                   disabled={!username.trim() || !isConnected}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-2.5 sm:py-3 rounded-xl font-semibold active:from-blue-700 active:to-cyan-600 sm:hover:from-blue-700 sm:hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[48px]"
                 >
                   {isConnected ? t('common.continue') : t('common.connecting')}
                 </button>
@@ -246,13 +246,13 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
       <Header isConnected={isConnected} userId={userId} onNavigate={onNavigate} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 flex-1 flex flex-col">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8 md:py-12 flex-1 flex flex-col">
         {/* Username change section */}
         {isUsernameSet && (
-          <div className="mb-6 flex justify-end">
+          <div className="mb-4 sm:mb-6 flex justify-end">
             <button
               onClick={() => setShowUsernameForm(!showUsernameForm)}
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-xs sm:text-sm text-blue-600 active:text-blue-700 sm:hover:text-blue-700 font-medium py-2 px-2 touch-manipulation min-h-[44px] min-w-[44px]"
             >
               {showUsernameForm ? t('home.hideUsername') : t('home.changeUsername')}
             </button>
@@ -260,29 +260,29 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
         )}
 
         {showUsernameForm && isUsernameSet && (
-          <div className="max-w-md mx-auto mb-8">
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
+          <div className="max-w-md mx-auto mb-6 sm:mb-8 px-2">
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 sm:mb-4 text-center">
                 {t('home.updateUsername')}
               </h3>
-              <p className="text-gray-600 mb-4 text-center text-sm">
+              <p className="text-gray-600 mb-3 sm:mb-4 text-center text-xs sm:text-sm">
                 {t('home.updateUsernameDescription')}
               </p>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 <input
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder={t('home.usernamePlaceholderNew')}
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-3 sm:px-4 py-2.5 sm:py-3 text-base border-2 border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   onKeyPress={(e) => e.key === 'Enter' && handleSetUsername()}
                   maxLength={20}
                 />
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                   <button
                     onClick={handleSetUsername}
                     disabled={!username.trim() || username.length < 3 || !isConnected}
-                    className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 rounded-xl font-semibold hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-2.5 sm:py-3 rounded-xl font-semibold active:from-blue-700 active:to-cyan-600 sm:hover:from-blue-700 sm:hover:to-cyan-600 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation min-h-[44px]"
                   >
                     {isConnected ? t('home.updateUsername') : t('common.connecting')}
                   </button>
@@ -291,7 +291,7 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
                       setShowUsernameForm(false);
                       setUsername(localStorage.getItem('displayUsername') || '');
                     }}
-                    className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold hover:bg-gray-300 transition-colors"
+                    className="px-4 py-2.5 sm:py-3 bg-gray-200 text-gray-700 rounded-xl font-semibold active:bg-gray-300 sm:hover:bg-gray-300 transition-colors touch-manipulation min-h-[44px]"
                   >
                     {t('common.cancel')}
                   </button>
@@ -305,54 +305,56 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
         )}
 
         <div className="flex-1 flex flex-col justify-center">
-          <div className="text-center mb-16 animate-fade-in">
-            <h2 className="text-5xl font-bold text-gray-900 mb-4">
+          <div className="text-center mb-8 sm:mb-12 md:mb-16 animate-fade-in">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4 px-2">
               {t('home.playChatCompete')}
             </h2>
-            <p className="text-xl text-gray-600">
+            <p className="text-base sm:text-lg md:text-xl text-gray-600 px-4">
               {t('home.joinFriends')}
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
             {games.map((game) => {
               return (
                 <div
                   key={game.id}
-                  className={`bg-white rounded-2xl shadow-lg p-6 cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-2xl ${
-                    selectedGame === game.id ? 'ring-4 ring-blue-500 ring-offset-2' : ''
+                  className={`bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 cursor-pointer transition-all duration-300 active:scale-95 sm:hover:scale-105 hover:shadow-2xl touch-manipulation ${
+                    selectedGame === game.id ? 'ring-2 sm:ring-4 ring-blue-500 ring-offset-1 sm:ring-offset-2' : ''
                   }`}
                   onClick={() => setSelectedGame(game.id)}
                 >
-                  <div className="w-32 h-32 mb-4 mx-auto flex items-center justify-center">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 mb-3 sm:mb-4 mx-auto flex items-center justify-center">
                     <img 
                       src={game.logo} 
                       alt={game.name} 
                       className="w-full h-full object-contain"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 text-center mb-1 sm:mb-2">
                     {game.name}
                   </h3>
-                  <p className="text-gray-600 text-center text-sm">{game.description}</p>
+                  <p className="text-gray-600 text-center text-xs sm:text-sm">{game.description}</p>
                 </div>
               );
             })}
           </div>
 
           {selectedGame && (
-            <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
-              <div className="bg-white rounded-2xl shadow-lg p-8">
-                <div className="flex items-center gap-3 mb-6">
-                  <Users className="w-6 h-6 text-blue-600" />
-                  <h3 className="text-2xl font-bold text-gray-900">
+            <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6 animate-fade-in px-2">
+              <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 md:p-8">
+                <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+                  <Users className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+                  <h3 className="text-xl sm:text-2xl font-bold text-gray-900">
                     {t('home.connectToMatch')}
                   </h3>
                 </div>
 
                 <button
                   onClick={() => handleRandomMatch(selectedGame)}
-                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-4 rounded-xl font-semibold text-lg hover:from-blue-700 hover:to-cyan-600 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl mb-6"
+                  className="w-full bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-3 sm:py-4 rounded-xl font-semibold text-base sm:text-lg active:scale-95 sm:hover:scale-105 transition-all duration-300 shadow-lg active:shadow-xl sm:hover:shadow-xl touch-manipulation min-h-[48px]"
                 >
                   {t('home.playRandomMatch')}
                 </button>

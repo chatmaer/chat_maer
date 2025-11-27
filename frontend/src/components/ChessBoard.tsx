@@ -280,19 +280,21 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
         onClick={() => handleSquareClick(x, y)}
         disabled={!isMyTurn || gameState.winningTeam !== null || promotionPosition !== null}
         className={`
-          aspect-square w-full flex items-center justify-center text-3xl
+          aspect-square w-full flex items-center justify-center text-2xl sm:text-3xl
           ${isLight ? 'bg-amber-100' : 'bg-amber-800'}
-          ${isSelected ? 'ring-2 sm:ring-4 ring-blue-500 ring-offset-1 sm:ring-offset-2' : ''}
+          ${isSelected ? 'ring-1 sm:ring-2 md:ring-4 ring-blue-500 ring-offset-0 sm:ring-offset-1 md:ring-offset-2' : ''}
           ${isHighlighted ? 'bg-green-400' : ''}
-          transition-all duration-150
-          ${piece && piece.team === playerTeam && isMyTurn ? 'cursor-pointer hover:opacity-80' : ''}
+          transition-all duration-150 touch-manipulation
+          ${piece && piece.team === playerTeam && isMyTurn ? 'cursor-pointer active:opacity-80 sm:hover:opacity-80' : ''}
         `}
       >
         {piece && (
           <img 
             src={PIECE_IMAGES[piece.team]?.[piece.type]} 
             alt={`${piece.team} ${piece.type}`}
-            className="w-[60%] h-[60%] sm:w-12 sm:h-12 object-contain"
+            className="w-[55%] h-[55%] sm:w-[60%] sm:h-[60%] md:w-12 md:h-12 object-contain"
+            loading="lazy"
+            decoding="async"
           />
         )}
       </button>
@@ -300,14 +302,14 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 h-full">
-      <div className="mb-3 text-center">
-        <p className="text-lg sm:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
+    <div className="flex flex-col items-center justify-center p-2 sm:p-4 h-full">
+      <div className="mb-2 sm:mb-3 text-center px-2">
+        <p className="text-base sm:text-lg md:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
         <p className="text-xs sm:text-sm text-gray-600 mt-1">
           {t('game.youAre')} {playerTeam === 'w' ? t('game.whiteBottom') : t('game.blackTop')} | {t('game.turn')} {gameState.totalTurns}
         </p>
       </div>
-      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[512px] mx-auto">
+      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[280px] sm:max-w-[400px] md:max-w-[512px] mx-auto">
         {Array.from({ length: 64 }).map((_, index) => {
           const x = index % 8;
           const y = Math.floor(index / 8);
@@ -320,22 +322,24 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
 
       {/* Pawn Promotion Modal */}
       {promotionPosition && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 shadow-xl">
-            <h3 className="text-xl font-bold mb-4 text-center">{t('game.promotion.promotePawn')}</h3>
-            <p className="text-sm text-gray-600 mb-4 text-center">{t('game.promotion.choosePiece')}</p>
-            <div className="grid grid-cols-4 gap-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl sm:rounded-lg p-4 sm:p-6 shadow-xl max-w-sm w-full">
+            <h3 className="text-lg sm:text-xl font-bold mb-3 sm:mb-4 text-center">{t('game.promotion.promotePawn')}</h3>
+            <p className="text-xs sm:text-sm text-gray-600 mb-3 sm:mb-4 text-center">{t('game.promotion.choosePiece')}</p>
+            <div className="grid grid-cols-4 gap-2 sm:gap-4">
               {['queen', 'rook', 'bishop', 'knight'].map((pieceType) => (
                 <button
                   key={pieceType}
                   onClick={() => handlePromotionChoice(pieceType)}
-                  className="w-20 h-20 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors border-2 border-transparent hover:border-blue-500"
+                  className="w-14 h-14 sm:w-18 sm:h-18 md:w-20 md:h-20 flex items-center justify-center bg-gray-100 active:bg-gray-200 sm:hover:bg-gray-200 rounded-lg transition-colors border-2 border-transparent active:border-blue-500 sm:hover:border-blue-500 touch-manipulation"
                   title={pieceType.charAt(0).toUpperCase() + pieceType.slice(1)}
                 >
                   <img 
                     src={PIECE_IMAGES[playerTeam]?.[pieceType]} 
                     alt={`${playerTeam} ${pieceType}`}
-                    className="w-16 h-16 object-contain"
+                    className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 object-contain"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </button>
               ))}

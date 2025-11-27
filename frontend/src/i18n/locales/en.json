@@ -306,7 +306,9 @@
     "insufficientBalanceGeneric": "Game cannot start: insufficient balance. Please charge your balance to start the game.",
     "insufficientBalance": "Insufficient balance",
     "rematchInsufficientBalanceSingle": "Rematch cannot start: {{players}} does not have sufficient balance (R$ {{amount}} required).",
-    "rematchInsufficientBalanceMultiple": "Rematch cannot start: {{players}} do not have sufficient balance (R$ {{amount}} required)."
+    "rematchInsufficientBalanceMultiple": "Rematch cannot start: {{players}} do not have sufficient balance (R$ {{amount}} required).",
+    "roomNotFound": "Room not found",
+    "notInRoom": "You are not in a room"
   },
   "authCallback": {
     "title": "Choose Your Username",

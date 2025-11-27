@@ -97,20 +97,20 @@ export default function GameInfoPanel({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <Trophy className="w-6 h-6 text-blue-600" />
-        <h3 className="text-xl font-bold text-gray-900">{getGameName()}</h3>
+    <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
+      <div className="flex items-center gap-2 sm:gap-3 mb-4 sm:mb-6">
+        <Trophy className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 flex-shrink-0" />
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900">{getGameName()}</h3>
       </div>
 
       {/* Game Status */}
-      <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200">
-        <div className="flex items-center gap-2 mb-2">
-          <Clock className="w-5 h-5 text-blue-600" />
-          <p className="font-semibold text-gray-800">{getGameStatus()}</p>
+      <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200">
+        <div className="flex items-center gap-2 mb-1.5 sm:mb-2">
+          <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 flex-shrink-0" />
+          <p className="font-semibold text-gray-800 text-sm sm:text-base">{getGameStatus()}</p>
         </div>
         {gameState && getCurrentPlayerInfo() && (
-          <p className="text-sm text-gray-600 mt-1">{getCurrentPlayerInfo()}</p>
+          <p className="text-xs sm:text-sm text-gray-600 mt-1">{getCurrentPlayerInfo()}</p>
         )}
         {gameType === 'chess' && gameState?.totalTurns && (
           <p className="text-xs text-gray-500 mt-1">{t('game.turn')} {gameState.totalTurns}</p>
@@ -123,12 +123,12 @@ export default function GameInfoPanel({
       </div>
 
       {/* Players */}
-      <div className="mb-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-gray-600" />
-          <h4 className="font-semibold text-gray-800">{t('game.players')}</h4>
+      <div className="mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 mb-3 sm:mb-4">
+          <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gray-600 flex-shrink-0" />
+          <h4 className="font-semibold text-gray-800 text-sm sm:text-base">{t('game.players')}</h4>
         </div>
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {players.map((player, index) => {
             const isCurrentPlayer = playerTeam && (
               (gameType === 'tic-tac-toe' && playerTeam === (index === 0 ? 'X' : 'O')) ||
@@ -139,19 +139,19 @@ export default function GameInfoPanel({
             return (
               <div
                 key={player.id}
-                className={`p-3 rounded-lg border-2 ${
+                className={`p-2.5 sm:p-3 rounded-lg border-2 ${
                   isCurrentPlayer
                     ? 'bg-blue-50 border-blue-300'
                     : 'bg-gray-50 border-gray-200'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <p className="font-medium text-gray-800">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-gray-800 text-sm sm:text-base truncate">
                     {getPlayerDisplayName(player, index)}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     {isCurrentPlayer && (
-                      <span className="text-xs bg-blue-600 text-white px-2 py-1 rounded-full">
+                      <span className="text-xs bg-blue-600 text-white px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
                         {t('common.you')}
                       </span>
                     )}

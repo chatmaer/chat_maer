@@ -2,6 +2,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile optimizations */
+* {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Text wrapping utilities */
+.break-words {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.hyphens-auto {
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -ms-hyphens: auto;
+}
+
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* Improve touch targets */
+button,
+a,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Optimize scrolling on mobile */
+html {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Prevent text size adjustment on iOS */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Optimize game boards for mobile */
+.game-board {
+  contain: layout style paint;
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -15,6 +65,7 @@
 
 .animate-fade-in {
   animation: fade-in 0.5s ease-out;
+  will-change: opacity, transform;
 }
 
 @keyframes slide-in {
@@ -30,4 +81,17 @@
 
 .animate-slide-in {
   animation: slide-in 0.3s ease-out;
+  will-change: opacity, transform;
+}
+
+/* Touch manipulation utility */
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Responsive text utilities */
+@media (max-width: 640px) {
+  .text-responsive {
+    font-size: 0.875rem;
+  }
 }

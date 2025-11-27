@@ -68,12 +68,12 @@ export default function TicTacToeBoard({ gameState, playerTeam, isMyTurn, player
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-4 h-full">
-      <div className="mb-3 text-center">
-        <p className="text-lg sm:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
+    <div className="flex flex-col items-center justify-center p-2 sm:p-4 h-full">
+      <div className="mb-2 sm:mb-3 text-center px-2">
+        <p className="text-base sm:text-lg md:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
         <p className="text-xs sm:text-sm text-gray-600 mt-1">{t('game.youAre')} {playerTeam}</p>
       </div>
-      <div className="grid grid-cols-3 w-full max-w-[288px] mx-auto">
+      <div className="grid grid-cols-3 w-full max-w-[240px] sm:max-w-[288px] mx-auto">
         {localBoard.map((value, index) => {
           const row = Math.floor(index / 3);
           const col = index % 3;
@@ -86,12 +86,12 @@ export default function TicTacToeBoard({ gameState, playerTeam, isMyTurn, player
               onClick={() => handleSquareClick(index)}
               disabled={!isMyTurn || value !== null || gameState.winner !== null || gameState.isDraw}
               className={`
-                aspect-square w-full bg-white flex items-center justify-center text-2xl sm:text-4xl
-                transition-all duration-200
-                ${!isLastCol ? 'border-r border-black' : ''}
-                ${!isLastRow ? 'border-b border-black' : ''}
+                aspect-square w-full bg-white flex items-center justify-center text-3xl sm:text-4xl md:text-5xl
+                transition-all duration-200 touch-manipulation
+                ${!isLastCol ? 'border-r-2 sm:border-r border-black' : ''}
+                ${!isLastRow ? 'border-b-2 sm:border-b border-black' : ''}
                 ${value === null && isMyTurn && !gameState.winner && !gameState.isDraw
-                  ? 'hover:bg-gray-100 cursor-pointer active:scale-95'
+                  ? 'active:bg-gray-100 sm:hover:bg-gray-100 cursor-pointer active:scale-95'
                   : 'cursor-not-allowed opacity-60'
                 }
                 ${value !== null ? 'bg-blue-50' : ''}
