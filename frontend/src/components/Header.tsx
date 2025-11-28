@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useNotification } from '../contexts/NotificationContext';
 import LanguageSwitcher from './LanguageSwitcher';
 import logo from '../assets/logo.png';
+import homeLogo from '../assets/home_logo.png';
 import { API_ENDPOINTS } from '../config/api';
 
 interface HeaderProps {
@@ -229,10 +230,17 @@ export default function Header({ username, isConnected, onLogout, userId, onNavi
       <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-shrink-0">
+            {/* Show home_logo on mobile/small screens, regular logo on larger screens */}
+            <img 
+              src={homeLogo} 
+              alt="Logo" 
+              className="h-6 sm:h-7 md:h-8 lg:h-9 xl:h-10 w-auto cursor-pointer active:opacity-80 sm:hover:opacity-80 transition-opacity touch-manipulation md:hidden" 
+              onClick={handleLogoClick}
+            />
             <img 
               src={logo} 
               alt="Logo" 
-              className="h-8 sm:h-9 md:h-10 w-auto cursor-pointer active:opacity-80 sm:hover:opacity-80 transition-opacity touch-manipulation" 
+              className="h-8 sm:h-9 md:h-10 w-auto cursor-pointer active:opacity-80 sm:hover:opacity-80 transition-opacity touch-manipulation hidden md:block" 
               onClick={handleLogoClick}
             />
           </div>
@@ -247,11 +255,11 @@ export default function Header({ username, isConnected, onLogout, userId, onNavi
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                 <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 relative z-10 drop-shadow-lg flex-shrink-0" />
-                <span className="relative z-10 drop-shadow-lg hidden xs:inline sm:inline">{t('header.updateButton')}</span>
+                <span className="relative z-10 drop-shadow-lg whitespace-nowrap">{t('header.updateButton')}</span>
                 <div className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300" />
               </button>
             )}
-            <span className="text-gray-700 font-medium text-xs sm:text-sm md:text-base truncate max-w-[60px] xs:max-w-[80px] sm:max-w-[100px] md:max-w-[150px] lg:max-w-none" title={displayUsername}>{displayUsername}</span>
+            <span className="text-gray-700 font-medium text-xs sm:text-sm md:text-base truncate max-w-[40px] xs:max-w-[50px] sm:max-w-[80px] md:max-w-[120px] lg:max-w-none" title={displayUsername}>{displayUsername}</span>
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <div className={`w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-gray-400'} animate-pulse`} />
               <span className="text-xs sm:text-sm text-gray-600 hidden sm:inline">

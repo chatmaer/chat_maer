@@ -127,7 +127,7 @@
     }
   },
   "chat": {
-    "title": "Chat",
+    "title": "Charlar",
     "noMessages": "Aún no hay mensajes. ¡Comienza a chatear!",
     "typeMessage": "Escribe un mensaje...",
     "send": "Enviar"

@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Video, VideoOff, Mic, MicOff } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { RTCManager, getLocalStream, startVideo, toggleAudio, toggleVideoTrack } from '../utils/webrtc';
 import { getSocket } from '../utils/socket';
 import { useNotification } from '../contexts/NotificationContext';
@@ -17,6 +18,7 @@ export default function VideoPanel({
   currentUserId,
   roomId 
 }: VideoPanelProps) {
+  const { t } = useTranslation();
   const { showNotification } = useNotification();
   const [isVideoOn, setIsVideoOn] = useState(false);
   const [isMuted, setIsMuted] = useState(true); // Start muted by default
@@ -350,101 +352,102 @@ export default function VideoPanel({
   };
 
   const getOpponentUsername = () => {
-    if (!currentUserId || !players || players.length < 2) return 'Opponent';
+    if (!currentUserId || !players || players.length < 2) return t('common.opponent');
     const opponent = players.find((p) => p.id !== currentUserId);
-    return opponent?.username || 'Opponent';
+    return opponent?.username || t('common.opponent');
   };
 
   const opponentUsername = getOpponentUsername();
   const opponentInitial = opponentUsername[0]?.toUpperCase() || 'O';
 
   return (
-    <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-3 sm:p-4 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-2 sm:mb-3">
-        <h3 className="font-semibold text-gray-800 text-sm sm:text-base">Video Chat</h3>
+    <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex flex-col">
+      <div className="flex items-center justify-between mb-1.5 sm:mb-2 flex-shrink-0">
+        <h3 className="font-semibold text-gray-800 text-xs sm:text-sm">{t('video.title')}</h3>
         {isConnecting && (
-          <span className="text-xs text-blue-600">Connecting...</span>
+          <span className="text-xs text-blue-600">{t('video.connecting')}</span>
         )}
       </div>
 
-      <div className="flex-1 grid grid-cols-2 gap-2 sm:gap-3 min-h-0 relative">
+      <div className="flex-1 grid grid-cols-2 gap-1.5 sm:gap-2 min-h-0 relative">
         {/* Local Video */}
-        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg sm:rounded-xl flex items-center justify-center relative overflow-hidden">
+        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-md sm:rounded-lg flex items-center justify-center relative overflow-hidden">
           <video 
             ref={localVideoRef}
-            className={`w-full h-full object-cover ${isVideoOn ? 'block' : 'hidden'}`}
+            className="w-full h-full object-cover absolute inset-0"
             autoPlay 
             muted 
             playsInline 
+            style={{ display: isVideoOn ? 'block' : 'none' }}
           />
           {!isVideoOn && (
             <div className="absolute inset-0 flex items-center justify-center text-center">
-              <div className="px-1 sm:px-2">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
-                  <span className="text-white text-lg sm:text-xl font-bold">Y</span>
+              <div className="px-1">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-1">
+                  <span className="text-white text-sm sm:text-base font-bold">Y</span>
                 </div>
-                <p className="text-gray-400 text-xs truncate max-w-full" title="You">You</p>
+                <p className="text-gray-400 text-[10px] sm:text-xs truncate max-w-full" title={t('common.you')}>{t('common.you')}</p>
               </div>
             </div>
           )}
-          <div className="absolute bottom-1.5 sm:bottom-2 left-1.5 sm:left-2 bg-black/50 text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded max-w-[calc(50%-0.5rem)] truncate" title="You">
-            You
+          <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] sm:text-xs px-1 py-0.5 rounded max-w-[calc(50%-0.25rem)] truncate" title={t('common.you')}>
+            {t('common.you')}
           </div>
         </div>
 
         {/* Remote Video */}
-        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg sm:rounded-xl flex items-center justify-center relative overflow-hidden">
+        <div className="aspect-video bg-gradient-to-br from-gray-800 to-gray-900 rounded-md sm:rounded-lg flex items-center justify-center relative overflow-hidden">
           <video 
             ref={remoteVideoRef}
-            className="w-full h-full object-cover" 
+            className="w-full h-full object-cover absolute inset-0" 
             autoPlay 
             playsInline 
             style={{ display: hasRemoteVideo ? 'block' : 'none' }}
           />
           {!hasRemoteVideo && (
             <div className="absolute inset-0 flex items-center justify-center text-center">
-              <div className="px-1 sm:px-2">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-1.5 sm:mb-2">
-                  <span className="text-white text-lg sm:text-xl font-bold">
+              <div className="px-1">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-1">
+                  <span className="text-white text-sm sm:text-base font-bold">
                     {opponentInitial}
                   </span>
                 </div>
-                <p className="text-gray-400 text-xs truncate max-w-full" title={opponentUsername}>
+                <p className="text-gray-400 text-[10px] sm:text-xs truncate max-w-full" title={opponentUsername}>
                   {opponentUsername}
                 </p>
               </div>
             </div>
           )}
-          <div className="absolute bottom-1.5 sm:bottom-2 left-1.5 sm:left-2 bg-black/50 text-white text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded max-w-[calc(50%-0.5rem)] truncate" title={opponentUsername}>
+          <div className="absolute bottom-1 left-1 bg-black/50 text-white text-[10px] sm:text-xs px-1 py-0.5 rounded max-w-[calc(50%-0.25rem)] truncate" title={opponentUsername}>
             {opponentUsername}
           </div>
         </div>
 
         {/* Control buttons positioned over the video area */}
-        <div className="absolute bottom-2 sm:bottom-4 left-1/2 transform -translate-x-1/2 flex gap-1.5 sm:gap-2 justify-center z-10">
+        <div className="absolute bottom-1 sm:bottom-2 left-1/2 transform -translate-x-1/2 flex gap-1 sm:gap-1.5 justify-center z-10">
           <button
             onClick={toggleVideo}
             disabled={isProcessing}
-            className={`p-2 sm:p-3 rounded-full transition-colors shadow-lg touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center ${
+            className={`p-1.5 sm:p-2 rounded-full transition-colors shadow-lg touch-manipulation min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center ${
               isVideoOn
                 ? 'bg-blue-600 text-white active:bg-blue-700 sm:hover:bg-blue-700'
                 : 'bg-gray-200 text-gray-700 active:bg-gray-300 sm:hover:bg-gray-300'
             } ${isProcessing ? 'opacity-50 cursor-not-allowed' : ''}`}
             title={isVideoOn ? 'Turn off video' : 'Turn on video'}
           >
-            {isVideoOn ? <Video className="w-4 h-4 sm:w-5 sm:h-5" /> : <VideoOff className="w-4 h-4 sm:w-5 sm:h-5" />}
+            {isVideoOn ? <Video className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <VideoOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           </button>
 
           <button
             onClick={toggleMute}
-            className={`p-2 sm:p-3 rounded-full transition-colors shadow-lg touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center ${
+            className={`p-1.5 sm:p-2 rounded-full transition-colors shadow-lg touch-manipulation min-h-[36px] min-w-[36px] sm:min-h-[40px] sm:min-w-[40px] flex items-center justify-center ${
               isMuted
                 ? 'bg-gray-200 text-gray-700 active:bg-gray-300 sm:hover:bg-gray-300'
                 : 'bg-blue-600 text-white active:bg-blue-700 sm:hover:bg-blue-700'
             }`}
             title={isMuted ? 'Unmute' : 'Mute'}
           >
-            {isMuted ? <MicOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Mic className="w-4 h-4 sm:w-5 sm:h-5" />}
+            {isMuted ? <MicOff className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
           </button>
         </div>
       </div>

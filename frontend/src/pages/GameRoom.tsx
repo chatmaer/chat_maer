@@ -598,34 +598,35 @@ export default function GameRoom({
   const showLoading = (isInitializing || (!gameState && !isWaiting)) && (roomId || localRoomId);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 flex flex-col">
       <Header isConnected={isConnected} username={username} onLogout={onLogout} userId={userId} onNavigate={onNavigate} />
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 md:py-8">
+      <main className="flex-1 max-w-7xl mx-auto px-2 sm:px-3 md:px-4 lg:px-6 xl:px-8 py-1 sm:py-2 md:py-3 lg:py-4 xl:py-6">
         {isWaiting && players.length > 0 && players.length < 2 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 text-center">
-            <p className="text-yellow-800 font-semibold text-sm sm:text-base">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg sm:rounded-xl p-1.5 sm:p-2 mb-1 sm:mb-2 text-center">
+            <p className="text-yellow-800 font-semibold text-[11px] sm:text-xs">
               {t('game.waitingForAnotherPlayer')}
             </p>
-            <p className="text-yellow-600 text-xs sm:text-sm mt-1">
+            <p className="text-yellow-600 text-[10px] sm:text-xs mt-0.5">
               {t('game.playersInRoom', { count: players.length })}
             </p>
           </div>
         )}
         {showLoading && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6 text-center">
-            <p className="text-blue-800 font-semibold text-sm sm:text-base">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg sm:rounded-xl p-1.5 sm:p-2 mb-1 sm:mb-2 text-center">
+            <p className="text-blue-800 font-semibold text-[11px] sm:text-xs">
               {t('game.connectingToRoom')}
             </p>
-            <p className="text-blue-600 text-xs sm:text-sm mt-1">
+            <p className="text-blue-600 text-[10px] sm:text-xs mt-0.5">
               {t('game.pleaseWait')}
             </p>
           </div>
         )}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6">
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-1.5 sm:gap-2 md:gap-3 lg:gap-4 xl:gap-6">
+          {/* Game Board Section */}
+          <div className="lg:col-span-2 space-y-1.5 sm:space-y-2">
             {gameState ? (
-              <div className="h-[min(500px,calc(100vh-300px))] sm:h-[min(600px,calc(100vh-250px))] md:h-[min(700px,calc(100vh-200px))] min-h-[300px] sm:min-h-[400px] max-h-[500px] sm:max-h-[600px] md:max-h-[700px]">
+              <div className="h-[calc(50vh-100px)] sm:h-[calc(50vh-110px)] md:h-[calc(50vh-120px)] lg:h-[min(700px,calc(100vh-200px))] min-h-[180px] sm:min-h-[200px] md:min-h-[220px] lg:min-h-[400px]">
                 <GameBoard
                   key={`board-${roomId || localRoomId}`}
                   gameType={gameType}
@@ -637,83 +638,89 @@ export default function GameRoom({
                 />
               </div>
             ) : isWaiting ? (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 flex items-center justify-center h-[min(500px,calc(100vh-300px))] sm:h-[min(600px,calc(100vh-250px))] md:h-[min(700px,calc(100vh-200px))] min-h-[300px] sm:min-h-[400px] max-h-[500px] sm:max-h-[600px] md:max-h-[700px]">
-                <div className="text-center px-4">
-                  <div className="w-40 h-40 sm:w-56 sm:h-56 md:w-64 md:h-64 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200 flex items-center justify-center mb-3 sm:mb-4 mx-auto">
-                    <span className="text-4xl sm:text-5xl md:text-6xl">
+              <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex items-center justify-center h-[calc(50vh-100px)] sm:h-[calc(50vh-110px)] md:h-[calc(50vh-120px)] lg:h-[min(700px,calc(100vh-200px))] min-h-[180px] sm:min-h-[200px] md:min-h-[220px] lg:min-h-[400px]">
+                <div className="text-center px-1 sm:px-2 md:px-4">
+                  <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 xl:w-56 xl:h-56 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg sm:rounded-xl border-2 border-blue-200 flex items-center justify-center mb-1.5 sm:mb-2 md:mb-3 mx-auto">
+                    <span className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
                       {gameType === 'tic-tac-toe' ? '⭕' : gameType === 'checkers' ? '⚫' : '♟️'}
                     </span>
                   </div>
-                  <p className="text-gray-600 font-medium text-sm sm:text-base">
+                  <p className="text-gray-600 font-medium text-[11px] sm:text-xs md:text-sm">
                     {gameType === 'tic-tac-toe' && t('game.board.ticTacToeBoard')}
                     {gameType === 'checkers' && t('game.board.checkersBoard')}
                     {gameType === 'chess' && t('game.board.chessBoard')}
                   </p>
-                  <p className="text-xs sm:text-sm text-gray-500 mt-2">{t('game.board.waitingForGameStart')}</p>
+                  <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5 sm:mt-1">{t('game.board.waitingForGameStart')}</p>
                 </div>
               </div>
             ) : (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 flex items-center justify-center h-[min(500px,calc(100vh-300px))] sm:h-[min(600px,calc(100vh-250px))] md:h-[min(700px,calc(100vh-200px))] min-h-[300px] sm:min-h-[400px] max-h-[500px] sm:max-h-[600px] md:max-h-[700px]">
+              <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3 flex items-center justify-center h-[calc(50vh-100px)] sm:h-[calc(50vh-110px)] md:h-[calc(50vh-120px)] lg:h-[min(700px,calc(100vh-200px))] min-h-[180px] sm:min-h-[200px] md:min-h-[220px] lg:min-h-[400px]">
                 <div className="text-center">
-                  <div className="inline-block w-6 h-6 sm:w-8 sm:h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3 sm:mb-4" />
-                  <p className="text-gray-600 text-sm sm:text-base">{t('game.loadingGame')}</p>
+                  <div className="inline-block w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-1.5 sm:mb-2 md:mb-3" />
+                  <p className="text-gray-600 text-[11px] sm:text-xs md:text-sm">{t('game.loadingGame')}</p>
                   {!isConnected && (
-                    <p className="text-xs sm:text-sm text-red-600 mt-2">{t('game.notConnectedToServer')}</p>
+                    <p className="text-[10px] sm:text-xs text-red-600 mt-0.5 sm:mt-1">{t('game.notConnectedToServer')}</p>
                   )}
                 </div>
               </div>
             )}
 
-
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
+            <div className="flex flex-col sm:flex-row gap-1 sm:gap-1.5">
               <button
                 onClick={onRematch}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-2.5 sm:py-3 rounded-xl font-semibold active:from-blue-700 active:to-cyan-600 sm:hover:from-blue-700 sm:hover:to-cyan-600 transition-all duration-300 flex items-center justify-center gap-2 shadow-lg active:shadow-xl sm:hover:shadow-xl touch-manipulation min-h-[48px] text-sm sm:text-base"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-cyan-500 text-white py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl font-semibold active:from-blue-700 active:to-cyan-600 sm:hover:from-blue-700 sm:hover:to-cyan-600 transition-all duration-300 flex items-center justify-center gap-1 sm:gap-1.5 shadow-lg active:shadow-xl sm:hover:shadow-xl touch-manipulation min-h-[36px] sm:min-h-[40px] md:min-h-[44px] text-[11px] sm:text-xs md:text-sm"
               >
-                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
+                <RotateCcw className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                 {t('game.rematch')}
               </button>
               <button
                 onClick={onExitRoom}
-                className="flex-1 bg-gray-200 text-gray-900 py-2.5 sm:py-3 rounded-xl font-semibold active:bg-gray-300 sm:hover:bg-gray-300 transition-colors flex items-center justify-center gap-2 touch-manipulation min-h-[48px] text-sm sm:text-base"
+                className="flex-1 bg-gray-200 text-gray-900 py-1.5 sm:py-2 md:py-2.5 rounded-lg sm:rounded-xl font-semibold active:bg-gray-300 sm:hover:bg-gray-300 transition-colors flex items-center justify-center gap-1 sm:gap-1.5 touch-manipulation min-h-[36px] sm:min-h-[40px] md:min-h-[44px] text-[11px] sm:text-xs md:text-sm"
               >
-                <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
+                <LogOut className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                 {t('game.exitRoom')}
               </button>
             </div>
           </div>
 
-          <div className="lg:col-span-3 space-y-4 sm:space-y-6 flex flex-col">
+          {/* Right Column: Video Chat and Chat */}
+          <div className="lg:col-span-3 space-y-1.5 sm:space-y-2 md:space-y-3 lg:space-y-4 flex flex-col">
             {players.length === 0 && (
-              <div className="bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6">
-                <div className="text-center text-gray-500 text-sm sm:text-base">
+              <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2 sm:p-3">
+                <div className="text-center text-gray-500 text-[11px] sm:text-xs md:text-sm">
                   <p>{t('game.waitingForPlayers')}</p>
                 </div>
               </div>
             )}
-            <div className="flex flex-col gap-4 sm:gap-6 h-[min(500px,calc(100vh-300px))] sm:h-[min(600px,calc(100vh-250px))] md:h-[min(700px,calc(100vh-200px))] min-h-[300px] sm:min-h-[400px] max-h-[500px] sm:max-h-[600px] md:max-h-[700px]">
-              <div className="flex-1 min-h-0">
-                <ChatPanel onSendMessage={handleSendMessage} messages={messages} />
-              </div>
-              <div className="flex-1 min-h-0">
-                <VideoPanel 
-                  onStartVideo={onStartVideo} 
-                  players={players} 
+            
+            {/* Video Chat - First on mobile */}
+            <div className="">
+              <VideoPanel 
+                onStartVideo={onStartVideo} 
+                players={players} 
+                currentUserId={userId}
+                roomId={roomId || localRoomId}
+              />
+            </div>
+
+            {/* Chat - Below Video Chat on mobile */}
+            <div className="h-[calc(25vh-50px)] sm:h-[calc(25vh-55px)] md:h-[calc(25vh-60px)] lg:h-[400px] xl:h-[450px] min-h-[100px] sm:min-h-[110px] md:min-h-[120px] lg:min-h-[350px] xl:min-h-[400px] flex-shrink-0">
+              <ChatPanel onSendMessage={handleSendMessage} messages={messages} />
+            </div>
+
+            {/* Game Info Panel - Visible on all screen sizes */}
+            {players.length > 0 && (
+              <div className="flex-shrink-0">
+                <GameInfoPanel
+                  gameType={gameType}
+                  players={players}
+                  gameState={gameState}
+                  playerTeam={getPlayerTeam()}
+                  isMyTurn={getIsMyTurn()}
+                  gameOver={gameOver}
                   currentUserId={userId}
-                  roomId={roomId || localRoomId}
                 />
               </div>
-            </div>
-            {players.length > 0 && (
-              <GameInfoPanel
-                gameType={gameType}
-                players={players}
-                gameState={gameState}
-                playerTeam={getPlayerTeam()}
-                isMyTurn={getIsMyTurn()}
-                gameOver={gameOver}
-                currentUserId={userId}
-              />
             )}
           </div>
         </div>

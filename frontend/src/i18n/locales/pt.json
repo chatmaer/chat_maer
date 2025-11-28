@@ -127,7 +127,7 @@
     }
   },
   "chat": {
-    "title": "Chat",
+    "title": "Bater papo",
     "noMessages": "Ainda não há mensagens. Comece a conversar!",
     "typeMessage": "Digite uma mensagem...",
     "send": "Enviar"
@@ -269,7 +269,7 @@
     "input": "Entrada"
   },
   "video": {
-    "title": "Videochat",
+    "title": "Bate-papo por vídeo",
     "connecting": "Conectando...",
     "turnOnVideo": "Ligar vídeo",
     "turnOffVideo": "Desligar vídeo",

@@ -302,14 +302,14 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-2 sm:p-4 h-full">
-      <div className="mb-2 sm:mb-3 text-center px-2">
-        <p className="text-base sm:text-lg md:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
-        <p className="text-xs sm:text-sm text-gray-600 mt-1">
+    <div className="flex flex-col items-center justify-center p-1 sm:p-2 md:p-4 h-full">
+      <div className="mb-1 sm:mb-2 md:mb-3 text-center px-1 sm:px-2">
+        <p className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
+        <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5">
           {t('game.youAre')} {playerTeam === 'w' ? t('game.whiteBottom') : t('game.blackTop')} | {t('game.turn')} {gameState.totalTurns}
         </p>
       </div>
-      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[280px] sm:max-w-[400px] md:max-w-[512px] mx-auto">
+      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[200px] sm:max-w-[280px] md:max-w-[400px] lg:max-w-[512px] mx-auto">
         {Array.from({ length: 64 }).map((_, index) => {
           const x = index % 8;
           const y = Math.floor(index / 8);
