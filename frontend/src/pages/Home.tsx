@@ -314,17 +314,17 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6 mb-8 sm:mb-12">
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 md:gap-6 mb-8 sm:mb-12">
             {games.map((game) => {
               return (
                 <div
                   key={game.id}
-                  className={`bg-white rounded-xl sm:rounded-2xl shadow-lg p-4 sm:p-6 cursor-pointer transition-all duration-300 active:scale-95 sm:hover:scale-105 hover:shadow-2xl touch-manipulation ${
+                  className={`bg-white rounded-xl sm:rounded-2xl shadow-lg p-2 sm:p-4 md:p-6 cursor-pointer transition-all duration-300 active:scale-95 sm:hover:scale-105 hover:shadow-2xl touch-manipulation ${
                     selectedGame === game.id ? 'ring-2 sm:ring-4 ring-blue-500 ring-offset-1 sm:ring-offset-2' : ''
                   }`}
                   onClick={() => setSelectedGame(game.id)}
                 >
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 md:w-32 md:h-32 mb-3 sm:mb-4 mx-auto flex items-center justify-center">
+                  <div className="w-12 h-12 sm:w-20 sm:h-20 md:w-24 md:h-24 lg:w-32 lg:h-32 mb-1 sm:mb-3 md:mb-4 mx-auto flex items-center justify-center">
                     <img 
                       src={game.logo} 
                       alt={game.name} 
@@ -333,10 +333,10 @@ export default function Home({ onNavigate, isConnected, username: propUsername, 
                       decoding="async"
                     />
                   </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-gray-900 text-center mb-1 sm:mb-2">
+                  <h3 className="text-xs sm:text-base md:text-lg lg:text-xl font-bold text-gray-900 text-center mb-0.5 sm:mb-1 md:mb-2">
                     {game.name}
                   </h3>
-                  <p className="text-gray-600 text-center text-xs sm:text-sm">{game.description}</p>
+                  <p className="text-gray-600 text-center text-[10px] sm:text-xs md:text-sm hidden sm:block">{game.description}</p>
                 </div>
               );
             })}
