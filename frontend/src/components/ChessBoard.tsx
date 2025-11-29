@@ -309,7 +309,7 @@ export default function ChessBoard({ gameState, playerTeam, isMyTurn, players, c
           {t('game.youAre')} {playerTeam === 'w' ? t('game.whiteBottom') : t('game.blackTop')} | {t('game.turn')} {gameState.totalTurns}
         </p>
       </div>
-      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[200px] sm:max-w-[280px] md:max-w-[400px] lg:max-w-[512px] mx-auto">
+      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full sm:max-w-[280px] md:max-w-[400px] lg:max-w-[512px] mx-auto">
         {Array.from({ length: 64 }).map((_, index) => {
           const x = index % 8;
           const y = Math.floor(index / 8);

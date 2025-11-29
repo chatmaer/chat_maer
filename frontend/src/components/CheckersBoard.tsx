@@ -105,7 +105,7 @@ export default function CheckersBoard({ gameState, playerTeam, isMyTurn, players
         <p className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl font-semibold text-gray-800">{getStatusMessage()}</p>
         <p className="text-[10px] sm:text-xs text-gray-600 mt-0.5">{t('game.youAre')} {playerTeam === 'player1' ? t('game.player1Bottom') : t('game.player2Top')}</p>
       </div>
-      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full max-w-[200px] sm:max-w-[280px] md:max-w-[400px] lg:max-w-[512px] mx-auto">
+      <div className="grid grid-cols-8 gap-0 overflow-hidden shadow-2xl w-full sm:max-w-[280px] md:max-w-[400px] lg:max-w-[512px] mx-auto">
         {Array.from({ length: 64 }).map((_, index) => {
           const x = index % 8;
           const y = Math.floor(index / 8);

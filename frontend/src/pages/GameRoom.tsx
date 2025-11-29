@@ -626,7 +626,7 @@ export default function GameRoom({
           {/* Game Board Section */}
           <div className="lg:col-span-2 space-y-1.5 sm:space-y-2">
             {gameState ? (
-              <div className="h-[calc(50vh-100px)] sm:h-[calc(50vh-110px)] md:h-[calc(50vh-120px)] lg:h-[min(700px,calc(100vh-200px))] min-h-[180px] sm:min-h-[200px] md:min-h-[220px] lg:min-h-[400px]">
+              <div>
                 <GameBoard
                   key={`board-${roomId || localRoomId}`}
                   gameType={gameType}

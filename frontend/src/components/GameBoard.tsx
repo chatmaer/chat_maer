@@ -22,13 +22,13 @@ export default function GameBoard({ gameType, gameState, playerTeam, isMyTurn, p
     );
   }
 
-  const gameTypeMap: Record<string, string> = {
-    'tic-tac-toe': 'tic_tac_toe',
-    'checkers': 'checkers',
-    'chess': 'chess',
-  };
+  // const gameTypeMap: Record<string, string> = {
+  //   'tic-tac-toe': 'tic_tac_toe',
+  //   'checkers': 'checkers',
+  //   'chess': 'chess',
+  // };
 
-  const serverGameType = gameTypeMap[gameType] || gameType;
+  // const serverGameType = gameTypeMap[gameType] || gameType;
 
   return (
     <div className="bg-white rounded-lg sm:rounded-xl shadow-lg p-1 sm:p-2 md:p-4 h-full flex flex-col overflow-hidden">
